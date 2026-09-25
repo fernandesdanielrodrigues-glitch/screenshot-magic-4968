@@ -20,7 +20,7 @@ export const Route = createFileRoute("/equipe")({
 });
 
 function EquipePage() {
-  const { users, schedules, events, nameLeaderOfSector, toggleMemberStatus } = useStore();
+  const { users, schedules, events, nameLeaderOfSector, toggleMemberStatus, addMember, updateMember } = useStore();
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState<Skill | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -28,6 +28,7 @@ function EquipePage() {
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [modalUser, setModalUser] = useState<string>(users[0]?.id ?? "");
   const [modalSector, setModalSector] = useState<Skill>("Slide");
+  const [memberModal, setMemberModal] = useState<{ mode: "create" } | { mode: "edit"; userId: string } | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -57,12 +58,20 @@ function EquipePage() {
               className="w-full rounded-lg border border-input bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          <button
-            onClick={() => setLeaderModal(true)}
-            className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-          >
-            Nomear Líder
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={() => setMemberModal({ mode: "create" })}
+              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            >
+              + Novo Membro
+            </button>
+            <button
+              onClick={() => setLeaderModal(true)}
+              className="rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold text-secondary-foreground transition hover:opacity-90"
+            >
+              Nomear Líder
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -128,8 +137,8 @@ function EquipePage() {
                     },
                   },
                   {
-                    label: "Editar Competências",
-                    action: () => toast.info(`Competências de ${u.name} abertas para edição.`),
+                    label: "Editar Membro",
+                    action: () => setMemberModal({ mode: "edit", userId: u.id }),
                   },
                   { label: "Ver Histórico de Escalas", action: () => setHistoryFor(u.id) },
                   {
@@ -159,6 +168,24 @@ function EquipePage() {
           <p className="text-sm text-muted-foreground">Nenhum membro encontrado.</p>
         ) : null}
       </div>
+
+      {memberModal ? (
+        <MemberModal
+          key={memberModal.mode === "edit" ? memberModal.userId : "new"}
+          editing={memberModal.mode === "edit" ? users.find((u) => u.id === memberModal.userId) : undefined}
+          onClose={() => setMemberModal(null)}
+          onSave={(data) => {
+            if (memberModal.mode === "edit") {
+              updateMember(memberModal.userId, data);
+              toast.success("Membro atualizado.");
+            } else {
+              addMember(data);
+              toast.success(`${data.name} adicionado(a) à equipe.`);
+            }
+            setMemberModal(null);
+          }}
+        />
+      ) : null}
 
       {leaderModal ? (
         <Modal title="Nomear Líder de Setor" onClose={() => setLeaderModal(false)}>
@@ -221,6 +248,113 @@ function EquipePage() {
         </Modal>
       ) : null}
     </AppShell>
+  );
+}
+
+interface MemberFormData {
+  name: string;
+  email: string;
+  skills: Skill[];
+  status: "Ativo" | "Indisponível";
+  leaderOf: Skill | null;
+}
+
+function MemberModal({
+  editing,
+  onClose,
+  onSave,
+}: {
+  editing?: (ReturnType<typeof useStore>["users"])[number] | undefined;
+  onClose: () => void;
+  onSave: (data: MemberFormData) => void;
+}) {
+  const [name, setName] = useState(editing?.name ?? "");
+  const [email, setEmail] = useState(editing?.email ?? "");
+  const [skills, setSkills] = useState<Skill[]>(editing?.skills ?? []);
+  const [status, setStatus] = useState<"Ativo" | "Indisponível">(editing?.status ?? "Ativo");
+  const [leaderOf, setLeaderOf] = useState<Skill | null>((editing?.is_leader_of_sector as Skill | null) ?? null);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggleSkill = (s: Skill) =>
+    setSkills((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+
+  const save = () => {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    if (!trimmedName) return setError("Informe o nome completo.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) return setError("Informe um e-mail válido.");
+    if (skills.length === 0) return setError("Selecione ao menos uma competência.");
+    onSave({ name: trimmedName.slice(0, 100), email: trimmedEmail.slice(0, 255), skills, status, leaderOf });
+  };
+
+  return (
+    <Modal title={editing ? `Editar — ${editing.name}` : "Novo Membro"} onClose={onClose}>
+      <label className="block text-sm font-medium text-foreground">Nome completo</label>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value.slice(0, 100))}
+        placeholder="Ex.: Ana Souza"
+        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+      />
+
+      <label className="mt-4 block text-sm font-medium text-foreground">E-mail</label>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value.slice(0, 255))}
+        placeholder="ana@exemplo.com"
+        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+      />
+
+      <p className="mt-4 text-sm font-medium text-foreground">Competências / Funções</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {SKILLS.map((s) => (
+          <SkillTag key={s} skill={s} active={skills.includes(s)} onClick={() => toggleSkill(s)} />
+        ))}
+      </div>
+
+      <label className="mt-4 block text-sm font-medium text-foreground">Atribuir liderança (opcional)</label>
+      <select
+        value={leaderOf ?? ""}
+        onChange={(e) => setLeaderOf(e.target.value === "" ? null : (e.target.value as Skill))}
+        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+      >
+        <option value="">Nenhum</option>
+        {SKILLS.map((s) => (
+          <option key={s} value={s}>
+            Líder de {s}
+          </option>
+        ))}
+      </select>
+
+      <p className="mt-4 text-sm font-medium text-foreground">Status</p>
+      <div className="mt-2 flex gap-2">
+        {(["Ativo", "Indisponível"] as const).map((st) => (
+          <button
+            key={st}
+            onClick={() => setStatus(st)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              status === st
+                ? st === "Ativo"
+                  ? "bg-success/15 text-success ring-2 ring-success"
+                  : "bg-muted text-muted-foreground ring-2 ring-muted-foreground"
+                : "bg-secondary text-secondary-foreground"
+            }`}
+          >
+            {st}
+          </button>
+        ))}
+      </div>
+
+      {error ? <p className="mt-3 text-sm font-medium text-destructive">{error}</p> : null}
+
+      <button
+        onClick={save}
+        className="mt-6 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+      >
+        Salvar
+      </button>
+    </Modal>
   );
 }
 
