@@ -264,7 +264,7 @@ function MemberModal({
   onClose,
   onSave,
 }: {
-  editing?: (ReturnType<typeof useStore>["users"])[number];
+  editing?: (ReturnType<typeof useStore>["users"])[number] | undefined;
   onClose: () => void;
   onSave: (data: MemberFormData) => void;
 }) {
