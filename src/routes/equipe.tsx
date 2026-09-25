@@ -20,7 +20,7 @@ export const Route = createFileRoute("/equipe")({
 });
 
 function EquipePage() {
-  const { users, schedules, events, nameLeaderOfSector, toggleMemberStatus } = useStore();
+  const { users, schedules, events, nameLeaderOfSector, toggleMemberStatus, addMember, updateMember } = useStore();
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState<Skill | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -28,6 +28,7 @@ function EquipePage() {
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [modalUser, setModalUser] = useState<string>(users[0]?.id ?? "");
   const [modalSector, setModalSector] = useState<Skill>("Slide");
+  const [memberModal, setMemberModal] = useState<{ mode: "create" } | { mode: "edit"; userId: string } | null>(null);
 
   const filtered = useMemo(
     () =>
