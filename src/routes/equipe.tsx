@@ -58,12 +58,20 @@ function EquipePage() {
               className="w-full rounded-lg border border-input bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          <button
-            onClick={() => setLeaderModal(true)}
-            className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
-          >
-            Nomear Líder
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={() => setMemberModal({ mode: "create" })}
+              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            >
+              + Novo Membro
+            </button>
+            <button
+              onClick={() => setLeaderModal(true)}
+              className="rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold text-secondary-foreground transition hover:opacity-90"
+            >
+              Nomear Líder
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -129,8 +137,8 @@ function EquipePage() {
                     },
                   },
                   {
-                    label: "Editar Competências",
-                    action: () => toast.info(`Competências de ${u.name} abertas para edição.`),
+                    label: "Editar Membro",
+                    action: () => setMemberModal({ mode: "edit", userId: u.id }),
                   },
                   { label: "Ver Histórico de Escalas", action: () => setHistoryFor(u.id) },
                   {
@@ -160,6 +168,24 @@ function EquipePage() {
           <p className="text-sm text-muted-foreground">Nenhum membro encontrado.</p>
         ) : null}
       </div>
+
+      {memberModal ? (
+        <MemberModal
+          key={memberModal.mode === "edit" ? memberModal.userId : "new"}
+          editing={memberModal.mode === "edit" ? users.find((u) => u.id === memberModal.userId) : undefined}
+          onClose={() => setMemberModal(null)}
+          onSave={(data) => {
+            if (memberModal.mode === "edit") {
+              updateMember(memberModal.userId, data);
+              toast.success("Membro atualizado.");
+            } else {
+              addMember(data);
+              toast.success(`${data.name} adicionado(a) à equipe.`);
+            }
+            setMemberModal(null);
+          }}
+        />
+      ) : null}
 
       {leaderModal ? (
         <Modal title="Nomear Líder de Setor" onClose={() => setLeaderModal(false)}>
