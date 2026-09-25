@@ -272,7 +272,7 @@ function MemberModal({
   const [email, setEmail] = useState(editing?.email ?? "");
   const [skills, setSkills] = useState<Skill[]>(editing?.skills ?? []);
   const [status, setStatus] = useState<"Ativo" | "Indisponível">(editing?.status ?? "Ativo");
-  const [leaderOf, setLeaderOf] = useState<Skill | null>(editing?.is_leader_of_sector ?? null);
+  const [leaderOf, setLeaderOf] = useState<Skill | null>((editing?.is_leader_of_sector as Skill | null) ?? null);
   const [error, setError] = useState<string | null>(null);
 
   const toggleSkill = (s: Skill) =>
