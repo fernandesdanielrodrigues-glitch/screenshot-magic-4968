@@ -316,7 +316,7 @@ function MemberModal({
       <label className="mt-4 block text-sm font-medium text-foreground">Atribuir liderança (opcional)</label>
       <select
         value={leaderOf ?? ""}
-        onChange={(e) => setLeaderOf((e.target.value || null) as Skill | null)}
+        onChange={(e) => setLeaderOf(e.target.value === "" ? null : (e.target.value as Skill))}
         className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
       >
         <option value="">Nenhum</option>
