@@ -81,6 +81,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             skills: data.skills,
             status: data.status,
             is_leader_of_sector: data.leaderOf ?? null,
+            avatar_url: null,
             unavailable_dates: [],
           },
         ]);
