@@ -24,7 +24,7 @@ interface StoreValue {
   nameLeaderOfSector: (userId: string, sector: Skill) => void;
   toggleMemberStatus: (userId: string) => void;
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus) => void;
-  publishSchedule: (eventId: string, assignments: Record<string, string[]>) => void;
+  publishSchedule: (eventId: string, assignments: Record<Skill, string[]>) => void;
   pushNotification: (message: string, kind: NotificationItem["kind"]) => void;
 }
 

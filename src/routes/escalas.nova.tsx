@@ -19,24 +19,24 @@ export const Route = createFileRoute("/escalas/nova")({
   component: NovaEscala,
 });
 
-const emptyAssignments: Record<Skill, string[]> = {
-  Slide: [],
-  "Telão": [],
-  "Câmera": [],
-  Social: [],
-};
+function buildAssignments(
+  eventId: string,
+  schedules: { event_id: string; sector_name: Skill; user_id: string }[],
+): Record<Skill, string[]> {
+  const base: Record<Skill, string[]> = { Slide: [], "Telão": [], "Câmera": [], Social: [] };
+  schedules
+    .filter((s) => s.event_id === eventId)
+    .forEach((s) => base[s.sector_name].push(s.user_id));
+  return base;
+}
 
 function NovaEscala() {
   const { users, events, schedules, publishSchedule } = useStore();
   const [eventId, setEventId] = useState(events[0]?.id ?? "");
   const [skillFilter, setSkillFilter] = useState<Skill | null>(null);
-  const [assignments, setAssignments] = useState<Record<Skill, string[]>>(() => {
-    const base = { ...emptyAssignments, Slide: [], "Telão": [], "Câmera": [], Social: [] };
-    schedules
-      .filter((s) => s.event_id === (events[0]?.id ?? ""))
-      .forEach((s) => base[s.sector_name].push(s.user_id));
-    return base;
-  });
+  const [assignments, setAssignments] = useState<Record<Skill, string[]>>(() =>
+    buildAssignments(events[0]?.id ?? "", schedules),
+  );
 
   const event = events.find((e) => e.id === eventId);
   const eventDay = event ? dateKey(event.date_time) : "";
