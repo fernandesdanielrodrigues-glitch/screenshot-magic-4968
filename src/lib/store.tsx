@@ -26,6 +26,23 @@ interface StoreValue {
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus) => void;
   publishSchedule: (eventId: string, assignments: Record<Skill, string[]>) => void;
   pushNotification: (message: string, kind: NotificationItem["kind"]) => void;
+  addMember: (data: {
+    name: string;
+    email: string;
+    skills: Skill[];
+    status: User["status"];
+    leaderOf?: Skill | null;
+  }) => void;
+  updateMember: (
+    userId: string,
+    data: {
+      name: string;
+      email: string;
+      skills: Skill[];
+      status: User["status"];
+      leaderOf?: Skill | null;
+    },
+  ) => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
