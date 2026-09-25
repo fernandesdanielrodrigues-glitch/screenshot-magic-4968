@@ -97,11 +97,7 @@ function NovaEscala() {
               value={eventId}
               onChange={(e) => {
                 setEventId(e.target.value);
-                const base: Record<Skill, string[]> = { Slide: [], "Telão": [], "Câmera": [], Social: [] };
-                schedules
-                  .filter((s) => s.event_id === e.target.value)
-                  .forEach((s) => base[s.sector_name].push(s.user_id));
-                setAssignments(base);
+                setAssignments(buildAssignments(e.target.value, schedules));
               }}
               className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
             >
