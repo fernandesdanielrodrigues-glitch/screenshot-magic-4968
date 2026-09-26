@@ -77,7 +77,7 @@ function NovaEscala() {
   function selectSunday(d: Date) {
     const key = toKey(d);
     const existing = events.find((e) => dateKey(e.date_time) === key);
-    if (existing) return selectEvent(existing.id);
+    if (existing) { selectEvent(existing.id); return; }
     const id = addEvent({ title: "Culto de Domingo", date_time: `${key}T10:00:00`, recurring: false });
     setEventId(id);
     setAssignments(emptyAssign());
@@ -127,7 +127,7 @@ function NovaEscala() {
         const bSun = new Date(b.date_time).getDay() === 0 ? 1 : 0;
         return bSun - aSun || b.date_time.localeCompare(a.date_time);
       })[0];
-    if (!previous) return toast.error("Nenhuma escala anterior encontrada.");
+    if (!previous) { toast.error("Nenhuma escala anterior encontrada."); return; }
     const base = buildAssignments(previous.id, schedules);
     let removed = 0;
     SKILLS.forEach((s) => {
