@@ -26,6 +26,7 @@ interface StoreValue {
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus) => void;
   publishSchedule: (eventId: string, assignments: Record<Skill, string[]>) => void;
   pushNotification: (message: string, kind: NotificationItem["kind"]) => void;
+  addEvent: (data: { title: string; date_time: string; recurring: boolean }) => string;
   addMember: (data: {
     name: string;
     email: string;
@@ -50,7 +51,7 @@ const StoreContext = createContext<StoreValue | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>(seedUsers);
   const [sectors, setSectors] = useState<Sector[]>(seedSectors);
-  const [events] = useState<AppEvent[]>(seedEvents);
+  const [events, setEvents] = useState<AppEvent[]>(seedEvents);
   const [schedules, setSchedules] = useState<Schedule[]>(initialSchedules);
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
 
@@ -69,6 +70,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notifications,
       userById: (id) => users.find((u) => u.id === id),
       pushNotification,
+      addEvent: ({ title, date_time, recurring }) => {
+        const base = Date.now();
+        const count = recurring ? 4 : 1;
+        const created: AppEvent[] = Array.from({ length: count }, (_, i) => {
+          const d = new Date(date_time);
+          d.setDate(d.getDate() + 7 * i);
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+          return { id: `ev${base}-${i}`, title, date_time: iso, description: recurring ? "Evento recorrente semanal." : "" };
+        });
+        setEvents((prev) => [...prev, ...created].sort((a, b) => a.date_time.localeCompare(b.date_time)));
+        pushNotification(`Evento "${title}" criado${recurring ? " (recorrente, 4 semanas)" : ""}.`, "system");
+        return created[0]!.id;
+      },
       addMember: (data) => {
         const id = `u${Date.now()}`;
         setUsers((prev) => [
