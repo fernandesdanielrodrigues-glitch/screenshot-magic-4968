@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as EquipeRouteImport } from './routes/equipe'
 import { Route as MinhaAgendaRouteImport } from './routes/minha-agenda'
 import { Route as EscalasNovaRouteImport } from './routes/escalas.nova'
@@ -17,6 +18,11 @@ import { Route as EscalasNovaRouteImport } from './routes/escalas.nova'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalendarioRoute = CalendarioRouteImport.update({
+  id: '/calendario',
+  path: '/calendario',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EquipeRoute = EquipeRouteImport.update({
@@ -37,12 +43,14 @@ const EscalasNovaRoute = EscalasNovaRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/calendario': typeof CalendarioRoute
   '/equipe': typeof EquipeRoute
   '/minha-agenda': typeof MinhaAgendaRoute
   '/escalas/nova': typeof EscalasNovaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/calendario': typeof CalendarioRoute
   '/equipe': typeof EquipeRoute
   '/minha-agenda': typeof MinhaAgendaRoute
   '/escalas/nova': typeof EscalasNovaRoute
@@ -50,20 +58,28 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/calendario': typeof CalendarioRoute
   '/equipe': typeof EquipeRoute
   '/minha-agenda': typeof MinhaAgendaRoute
   '/escalas/nova': typeof EscalasNovaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/equipe' | '/minha-agenda' | '/escalas/nova'
+  fullPaths: '/' | '/calendario' | '/equipe' | '/minha-agenda' | '/escalas/nova'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/equipe' | '/minha-agenda' | '/escalas/nova'
-  id: '__root__' | '/' | '/equipe' | '/minha-agenda' | '/escalas/nova'
+  to: '/' | '/calendario' | '/equipe' | '/minha-agenda' | '/escalas/nova'
+  id:
+    | '__root__'
+    | '/'
+    | '/calendario'
+    | '/equipe'
+    | '/minha-agenda'
+    | '/escalas/nova'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CalendarioRoute: typeof CalendarioRoute
   EquipeRoute: typeof EquipeRoute
   MinhaAgendaRoute: typeof MinhaAgendaRoute
   EscalasNovaRoute: typeof EscalasNovaRoute
@@ -76,6 +92,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calendario': {
+      id: '/calendario'
+      path: '/calendario'
+      fullPath: '/calendario'
+      preLoaderRoute: typeof CalendarioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/equipe': {
@@ -104,6 +127,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CalendarioRoute: CalendarioRoute,
   EquipeRoute: EquipeRoute,
   MinhaAgendaRoute: MinhaAgendaRoute,
   EscalasNovaRoute: EscalasNovaRoute,
