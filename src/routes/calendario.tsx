@@ -23,7 +23,7 @@ export const Route = createFileRoute("/calendario")({
 });
 
 const CATS: Record<EventCategory, { label: string; cls: string; dot: string }> = {
-  domingo: { label: "Culto de Domingo", cls: "bg-primary text-primary-foreground", dot: "bg-primary" },
+  domingo: { label: "Culto de Domingo", cls: "bg-accent text-accent-foreground", dot: "bg-accent" },
   semana: { label: "Semana / Reunião", cls: "bg-primary-deep text-primary-foreground", dot: "bg-primary-deep" },
   especial: { label: "Evento Especial", cls: "bg-ocean text-primary-foreground", dot: "bg-ocean" },
 };
@@ -251,7 +251,7 @@ function EventDetailsModal({ event, onClose }: { event: AppEvent; onClose: () =>
 
       <button
         onClick={() => navigate({ to: "/escalas/nova", search: { evento: event.id } })}
-        className="mt-5 w-full rounded-lg bg-primary px-4 py-3 text-sm font-bold text-primary-foreground hover:opacity-90"
+        className="mt-5 w-full rounded-lg bg-accent px-4 py-3 text-sm font-bold text-accent-foreground hover:opacity-90"
       >
         Atribuir Funções / Gerenciar Escala
       </button>
