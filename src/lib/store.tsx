@@ -26,7 +26,7 @@ interface StoreValue {
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus) => void;
   publishSchedule: (eventId: string, assignments: Record<Skill, string[]>) => void;
   pushNotification: (message: string, kind: NotificationItem["kind"]) => void;
-  addEvent: (data: { title: string; date_time: string; recurring: boolean; description?: string; category?: AppEvent["category"]; end_time?: string }) => string;
+  addEvent: (data: { title: string; date_time: string; recurring: boolean; description?: string | undefined; category?: AppEvent["category"]; end_time?: string | undefined }) => string;
   addMember: (data: {
     name: string;
     email: string;

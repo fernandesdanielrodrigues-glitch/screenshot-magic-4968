@@ -19,7 +19,7 @@ export const Route = createFileRoute("/escalas/nova")({
     ],
   }),
   validateSearch: (s: Record<string, unknown>): { evento?: string } =>
-    typeof s.evento === "string" ? { evento: s.evento } : {},
+    typeof s["evento"] === "string" ? { evento: s["evento"] as string } : {},
   component: NovaEscala,
 });
 
