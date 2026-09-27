@@ -26,7 +26,11 @@ export interface AppEvent {
   title: string;
   date_time: string;
   description: string;
+  category?: EventCategory | undefined;
+  end_time?: string | undefined;
 }
+
+export type EventCategory = "domingo" | "semana" | "especial";
 
 export interface Schedule {
   id: string;
