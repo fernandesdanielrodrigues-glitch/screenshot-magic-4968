@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/calendario", label: "Calendário", icon: CalendarDays },
   { to: "/equipe", label: "Equipe", icon: Users },
   { to: "/escalas/nova", label: "Criar Escala", icon: ListChecks },
   { to: "/minha-agenda", label: "Minha Agenda", icon: Smartphone },

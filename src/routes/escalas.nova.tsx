@@ -18,6 +18,8 @@ export const Route = createFileRoute("/escalas/nova")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>): { evento?: string } =>
+    typeof s.evento === "string" ? { evento: s.evento } : {},
   component: NovaEscala,
 });
 
@@ -49,10 +51,12 @@ function buildAssignments(
 
 function NovaEscala() {
   const { users, events, schedules, publishSchedule, addEvent } = useStore();
-  const [eventId, setEventId] = useState(events[0]?.id ?? "");
+  const { evento } = Route.useSearch();
+  const initialId = events.find((e) => e.id === evento)?.id ?? events[0]?.id ?? "";
+  const [eventId, setEventId] = useState(initialId);
   const [skillFilter, setSkillFilter] = useState<Skill | null>(null);
   const [assignments, setAssignments] = useState<Record<Skill, string[]>>(() =>
-    buildAssignments(events[0]?.id ?? "", schedules),
+    buildAssignments(initialId, schedules),
   );
   const [eventModal, setEventModal] = useState(false);
   const [addMenu, setAddMenu] = useState<Skill | null>(null);

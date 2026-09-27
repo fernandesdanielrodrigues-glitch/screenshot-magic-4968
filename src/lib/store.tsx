@@ -26,7 +26,7 @@ interface StoreValue {
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus) => void;
   publishSchedule: (eventId: string, assignments: Record<Skill, string[]>) => void;
   pushNotification: (message: string, kind: NotificationItem["kind"]) => void;
-  addEvent: (data: { title: string; date_time: string; recurring: boolean }) => string;
+  addEvent: (data: { title: string; date_time: string; recurring: boolean; description?: string; category?: AppEvent["category"]; end_time?: string }) => string;
   addMember: (data: {
     name: string;
     email: string;
@@ -70,7 +70,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notifications,
       userById: (id) => users.find((u) => u.id === id),
       pushNotification,
-      addEvent: ({ title, date_time, recurring }) => {
+      addEvent: ({ title, date_time, recurring, description, category, end_time }) => {
         const base = Date.now();
         const count = recurring ? 4 : 1;
         const created: AppEvent[] = Array.from({ length: count }, (_, i) => {
@@ -78,7 +78,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           d.setDate(d.getDate() + 7 * i);
           const pad = (n: number) => String(n).padStart(2, "0");
           const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-          return { id: `ev${base}-${i}`, title, date_time: iso, description: recurring ? "Evento recorrente semanal." : "" };
+          return { id: `ev${base}-${i}`, title, date_time: iso, description: description ?? (recurring ? "Evento recorrente semanal." : ""), category, end_time };
         });
         setEvents((prev) => [...prev, ...created].sort((a, b) => a.date_time.localeCompare(b.date_time)));
         pushNotification(`Evento "${title}" criado${recurring ? " (recorrente, 4 semanas)" : ""}.`, "system");
