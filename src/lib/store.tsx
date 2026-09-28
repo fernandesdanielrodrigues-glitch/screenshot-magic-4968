@@ -22,6 +22,7 @@ interface StoreValue {
   notifications: NotificationItem[];
   userById: (id: string) => User | undefined;
   nameLeaderOfSector: (userId: string, sector: Skill) => void;
+  setUserRole: (userId: string, role: User["role"]) => void;
   toggleMemberStatus: (userId: string) => void;
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus) => void;
   publishSchedule: (eventId: string, assignments: Record<Skill, string[]>) => void;
@@ -113,6 +114,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         }
         pushNotification(`${data.name} foi adicionado(a) à equipe.`, "system");
+      },
+      setUserRole: (userId, role) => {
+        setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)));
       },
       updateMember: (userId, data) => {
         setUsers((prev) =>

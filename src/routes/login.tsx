@@ -54,7 +54,6 @@ function LoginPage() {
       if (err) return setError(err);
       toast.success("Conta criada com sucesso!");
     }
-    navigate({ to: "/", replace: true });
   };
 
   return (
