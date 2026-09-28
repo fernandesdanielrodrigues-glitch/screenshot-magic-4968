@@ -27,7 +27,7 @@ const signUpSchema = z.object({
 });
 
 const inputCls =
-  "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30";
+  "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30";
 
 function LoginPage() {
   const { signIn, signUp } = useAuth();
@@ -61,7 +61,7 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-primary-deep px-4 py-10 font-sans">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-primary-foreground">
-          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary text-2xl font-black text-primary-foreground shadow-lg">
+          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-accent text-2xl font-black text-primary-foreground shadow-lg">
             S
           </div>
           <p className="mt-3 text-2xl font-bold tracking-tight">SyncMídia</p>
@@ -117,7 +117,7 @@ function LoginPage() {
                         onClick={() => setSkills((p) => (on ? p.filter((x) => x !== s) : [...p, s]))}
                         className={cn(
                           "rounded-full border px-3 py-1.5 text-sm font-medium transition",
-                          on ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground hover:border-primary",
+                          on ? "border-accent bg-accent text-primary-foreground" : "border-input text-muted-foreground hover:border-accent",
                         )}
                       >
                         {s}
@@ -131,13 +131,13 @@ function LoginPage() {
             {tab === "in" && (
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 text-muted-foreground">
-                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-primary" />
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-accent" />
                   Lembrar-me
                 </label>
                 <button
                   type="button"
                   onClick={() => toast.info("No modo de teste não enviamos e-mails. Use a conta de demonstração.")}
-                  className="font-medium text-primary hover:underline"
+                  className="font-medium text-accent hover:underline"
                 >
                   Esqueci minha senha
                 </button>
@@ -146,7 +146,7 @@ function LoginPage() {
 
             {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
 
-            <button type="submit" className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90">
+            <button type="submit" className="w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-accent/90">
               {tab === "in" ? "Entrar" : "Criar Conta"}
             </button>
           </form>
