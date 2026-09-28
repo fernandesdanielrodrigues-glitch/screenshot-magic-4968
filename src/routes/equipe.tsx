@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MoreHorizontal, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, LeaderBadge, MemberStatusBadge, SkillTag } from "@/components/Badges";
@@ -20,7 +21,10 @@ export const Route = createFileRoute("/equipe")({
 });
 
 function EquipePage() {
-  const { users, schedules, events, nameLeaderOfSector, toggleMemberStatus, addMember, updateMember } = useStore();
+  const { users, schedules, events, nameLeaderOfSector, toggleMemberStatus, addMember, updateMember, setUserRole } = useStore();
+  const { user: me } = useAuth();
+  const isAdmin = me?.role === "admin";
+  const leaderSector = me?.role === "leader" ? (me.leaderOf ?? null) : null;
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState<Skill | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -36,10 +40,10 @@ function EquipePage() {
         const matchesQuery =
           u.name.toLowerCase().includes(query.toLowerCase()) ||
           u.email.toLowerCase().includes(query.toLowerCase());
-        const matchesSector = !sector || u.skills.includes(sector);
+        const matchesSector = (!sector || u.skills.includes(sector)) && (!leaderSector || u.skills.includes(leaderSector));
         return matchesQuery && matchesSector;
       }),
-    [users, query, sector],
+    [users, query, sector, leaderSector],
   );
 
   const historyUser = users.find((u) => u.id === historyFor);
@@ -141,6 +145,17 @@ function EquipePage() {
                     action: () => setMemberModal({ mode: "edit", userId: u.id }),
                   },
                   { label: "Ver Histórico de Escalas", action: () => setHistoryFor(u.id) },
+                  ...(isAdmin
+                    ? (["admin", "leader", "member"] as const)
+                        .filter((r) => r !== u.role)
+                        .map((r) => ({
+                          label: `Alterar função → ${r === "admin" ? "Admin" : r === "leader" ? "Líder" : "Membro"}`,
+                          action: () => {
+                            setUserRole(u.id, r);
+                            toast.success(`Função de ${u.name} alterada.`);
+                          },
+                        }))
+                    : []),
                   {
                     label: u.status === "Ativo" ? "Desativar Membro" : "Reativar Membro",
                     action: () => {
