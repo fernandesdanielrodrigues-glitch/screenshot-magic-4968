@@ -13,6 +13,22 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "../lib/store";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+
+function AuthGate({ children }: { children: ReactNode }) {
+  const { user, ready } = useAuth();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const isLogin = pathname === "/login";
+  useEffect(() => {
+    if (!ready) return;
+    if (!user && !isLogin) navigate({ to: "/login", replace: true });
+    if (user && isLogin) navigate({ to: "/", replace: true });
+  }, [ready, user, isLogin, navigate]);
+  if (!isLogin && (!ready || !user)) return null;
+  return <>{children}</>;
+}
 
 function NotFoundComponent() {
   return (
@@ -131,11 +147,14 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-        <Toaster position="top-center" richColors />
-      </StoreProvider>
+      <AuthProvider>
+        <StoreProvider>
+          <AuthGate>
+            <Outlet />
+          </AuthGate>
+          <Toaster position="top-center" richColors />
+        </StoreProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
