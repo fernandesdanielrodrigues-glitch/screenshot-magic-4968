@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Bell, CalendarDays, LayoutDashboard, ListChecks, Menu, Smartphone, Users } from "lucide-react";
+import { Bell, CalendarDays, LayoutDashboard, ListChecks, LogOut, Menu, Smartphone, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
+import { initials, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -22,12 +23,15 @@ export function AppShell({
   children: ReactNode;
 }) {
   const { notifications } = useStore();
+  const { user, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
     month: "long",
   });
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background font-sans">
@@ -53,9 +57,20 @@ export function AppShell({
                 {notifications.length}
               </span>
             </button>
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent/90 text-sm font-bold text-accent-foreground">
-              MA
+            <div
+              title={user?.name}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent/90 text-sm font-bold text-accent-foreground"
+            >
+              {user ? initials(user.name) : "?"}
             </div>
+            <button
+              aria-label="Sair"
+              title="Sair"
+              onClick={signOut}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 transition hover:bg-white/20"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
             <button
               aria-label="Abrir menu"
               onClick={() => setOpen((v) => !v)}
