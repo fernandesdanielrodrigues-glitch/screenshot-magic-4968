@@ -24,13 +24,14 @@ export function AppShell({
 }) {
   const { notifications } = useStore();
   const { user, signOut } = useAuth();
-  if (!user) return null;
   const [open, setOpen] = useState(false);
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
     month: "long",
   });
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background font-sans">
