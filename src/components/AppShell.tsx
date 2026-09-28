@@ -24,6 +24,7 @@ export function AppShell({
 }) {
   const { notifications } = useStore();
   const { user, signOut } = useAuth();
+  if (!user) return null;
   const [open, setOpen] = useState(false);
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
