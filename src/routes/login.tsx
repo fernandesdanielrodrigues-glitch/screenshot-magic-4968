@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -31,7 +31,7 @@ const inputCls =
 
 function LoginPage() {
   const { signIn, signUp } = useAuth();
-  const navigate = useNavigate();
+
   const [tab, setTab] = useState<"in" | "up">("in");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

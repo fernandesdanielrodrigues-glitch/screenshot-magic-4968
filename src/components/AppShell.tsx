@@ -1,8 +1,16 @@
-import { Link } from "@tanstack/react-router";
-import { Bell, CalendarDays, LayoutDashboard, ListChecks, LogOut, Menu, Smartphone, Users } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Bell, CalendarDays, LayoutDashboard, ListChecks, LogOut, Menu, Smartphone, User as UserIcon, Users, FlaskConical } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
-import { initials, useAuth } from "@/lib/auth";
+import { canAccess, initials, roleLabel, useAuth, type Role } from "@/lib/auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -23,7 +31,8 @@ export function AppShell({
   children: ReactNode;
 }) {
   const { notifications } = useStore();
-  const { user, signOut } = useAuth();
+  const { user, signOut, testAs } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
@@ -35,6 +44,27 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-background font-sans">
+      <div className="flex flex-wrap items-center justify-center gap-2 bg-secondary px-4 py-1.5 text-xs text-secondary-foreground">
+        <FlaskConical className="h-3.5 w-3.5" /> <span className="font-semibold">Modo teste:</span>
+        {(
+          [
+            ["admin", "Admin"],
+            ["leader", "Líder"],
+            ["member", "Membro"],
+          ] as [Role, string][]
+        ).map(([r, l]) => (
+          <button
+            key={r}
+            onClick={() => testAs(r)}
+            className={cn(
+              "rounded-md border border-border px-2 py-0.5 font-medium transition hover:bg-background",
+              user.role === r && "bg-accent text-accent-foreground border-transparent",
+            )}
+          >
+            Testar como {l}
+          </button>
+        ))}
+      </div>
       <header style={{ background: "var(--gradient-header)" }} className="text-primary-foreground">
         <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-4 sm:flex sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
@@ -57,20 +87,34 @@ export function AppShell({
                 {notifications.length}
               </span>
             </button>
-            <div
-              title={user?.name}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent/90 text-sm font-bold text-accent-foreground"
-            >
-              {user ? initials(user.name) : "?"}
-            </div>
-            <button
-              aria-label="Sair"
-              title="Sair"
-              onClick={signOut}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 transition hover:bg-white/20"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            <span className="hidden rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold sm:inline">
+              {roleLabel(user)}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label="Menu do perfil"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent/90 text-sm font-bold text-accent-foreground outline-none ring-white/40 focus-visible:ring-2"
+              >
+                {initials(user.name)}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <p className="truncate">{user.name}</p>
+                  <p className="truncate text-xs font-normal text-muted-foreground">{roleLabel(user)}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => navigate({ to: "/perfil" })}>
+                  <UserIcon className="h-4 w-4" /> Meu Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => navigate({ to: "/minha-agenda" })}>
+                  <Smartphone className="h-4 w-4" /> Minha Agenda
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={signOut} className="text-destructive">
+                  <LogOut className="h-4 w-4" /> Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               aria-label="Abrir menu"
               onClick={() => setOpen((v) => !v)}
@@ -87,7 +131,7 @@ export function AppShell({
             open ? "grid" : "hidden sm:flex",
           )}
         >
-          {navItems.map((item) => (
+          {navItems.filter((i) => canAccess(user.role, i.to)).map((item) => (
             <Link
               key={item.to}
               to={item.to}
