@@ -15,6 +15,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as EquipeRouteImport } from './routes/equipe'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MinhaAgendaRouteImport } from './routes/minha-agenda'
+import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as EscalasNovaRouteImport } from './routes/escalas.nova'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,11 @@ const MinhaAgendaRoute = MinhaAgendaRouteImport.update({
   path: '/minha-agenda',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PerfilRoute = PerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EscalasNovaRoute = EscalasNovaRouteImport.update({
   id: '/escalas/nova',
   path: '/escalas/nova',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof EquipeRoute
   '/login': typeof LoginRoute
   '/minha-agenda': typeof MinhaAgendaRoute
+  '/perfil': typeof PerfilRoute
   '/escalas/nova': typeof EscalasNovaRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/equipe': typeof EquipeRoute
   '/login': typeof LoginRoute
   '/minha-agenda': typeof MinhaAgendaRoute
+  '/perfil': typeof PerfilRoute
   '/escalas/nova': typeof EscalasNovaRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/equipe': typeof EquipeRoute
   '/login': typeof LoginRoute
   '/minha-agenda': typeof MinhaAgendaRoute
+  '/perfil': typeof PerfilRoute
   '/escalas/nova': typeof EscalasNovaRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/login'
     | '/minha-agenda'
+    | '/perfil'
     | '/escalas/nova'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/login'
     | '/minha-agenda'
+    | '/perfil'
     | '/escalas/nova'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/login'
     | '/minha-agenda'
+    | '/perfil'
     | '/escalas/nova'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   EquipeRoute: typeof EquipeRoute
   LoginRoute: typeof LoginRoute
   MinhaAgendaRoute: typeof MinhaAgendaRoute
+  PerfilRoute: typeof PerfilRoute
   EscalasNovaRoute: typeof EscalasNovaRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MinhaAgendaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/perfil': {
+      id: '/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof PerfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/escalas/nova': {
       id: '/escalas/nova'
       path: '/escalas/nova'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   EquipeRoute: EquipeRoute,
   LoginRoute: LoginRoute,
   MinhaAgendaRoute: MinhaAgendaRoute,
+  PerfilRoute: PerfilRoute,
   EscalasNovaRoute: EscalasNovaRoute,
 }
 export const routeTree = rootRouteImport
