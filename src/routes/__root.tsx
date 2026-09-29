@@ -13,7 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "../lib/store";
 import { Toaster } from "@/components/ui/sonner";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider, canAccess, homeFor, useAuth } from "@/lib/auth";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
 function AuthGate({ children }: { children: ReactNode }) {
@@ -24,9 +24,10 @@ function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     if (!user && !isLogin) navigate({ to: "/login", replace: true });
-    if (user && isLogin) navigate({ to: "/", replace: true });
-  }, [ready, user, isLogin, navigate]);
-  if (!isLogin && (!ready || !user)) return null;
+    else if (user && (isLogin || !canAccess(user.role, pathname)))
+      navigate({ to: homeFor(user.role), replace: true });
+  }, [ready, user, isLogin, pathname, navigate]);
+  if (!isLogin && (!ready || !user || !canAccess(user.role, pathname))) return null;
   return <>{children}</>;
 }
 

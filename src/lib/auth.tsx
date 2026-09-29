@@ -5,6 +5,27 @@ export interface AuthUser {
   name: string;
   email: string;
   skills: Skill[];
+  role: Role;
+  leaderOf?: Skill | undefined;
+}
+
+export type Role = "admin" | "leader" | "member";
+
+export function homeFor(role: Role) {
+  return role === "member" ? "/minha-agenda" : "/";
+}
+
+export function canAccess(role: Role, path: string) {
+  if (path === "/login" || path === "/perfil" || path === "/minha-agenda") return true;
+  if (role === "admin") return true;
+  if (role === "leader") return ["/", "/dashboard", "/equipe", "/escalas/nova", "/calendario"].includes(path);
+  return false;
+}
+
+export function roleLabel(u: AuthUser) {
+  if (u.role === "admin") return "Admin";
+  if (u.role === "leader") return `Líder - ${u.leaderOf === "Câmera" ? "Câmeras" : (u.leaderOf ?? "Setor")}`;
+  return "Membro";
 }
 
 interface MockAccount extends AuthUser {
@@ -15,8 +36,9 @@ interface AuthCtx {
   user: AuthUser | null;
   ready: boolean;
   signIn: (email: string, password: string, remember: boolean) => string | null;
-  signUp: (data: MockAccount) => string | null;
+  signUp: (data: Omit<MockAccount, "role">) => string | null;
   signOut: () => void;
+  testAs: (role: Role) => void;
 }
 
 const ACCOUNTS_KEY = "syncmidia-accounts";
@@ -26,16 +48,24 @@ const DEMO: MockAccount = {
   email: "marina@syncmidia.app",
   password: "123456",
   skills: ["Slide", "Social"],
+  role: "admin",
 };
+const SEEDS: MockAccount[] = [
+  DEMO,
+  { name: "Rafael Souza", email: "rafael@syncmidia.app", password: "123456", skills: ["Câmera"], role: "leader", leaderOf: "Câmera" },
+  { name: "Juliana Prado", email: "juliana@syncmidia.app", password: "123456", skills: ["Slide", "Telão"], role: "member" },
+];
 
 const Ctx = createContext<AuthCtx | null>(null);
 
 function readAccounts(): MockAccount[] {
   try {
-    const list = JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "[]") as MockAccount[];
-    return list.some((a) => a.email === DEMO.email) ? list : [DEMO, ...list];
+    const list = (JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "[]") as MockAccount[]).filter(
+      (a) => !SEEDS.some((s) => s.email === a.email),
+    );
+    return [...SEEDS, ...list.map((a) => ({ ...a, role: a.role ?? "member" }))];
   } catch {
-    return [DEMO];
+    return SEEDS;
   }
 }
 
@@ -47,7 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
     if (raw) {
       try {
-        setUser(JSON.parse(raw));
+        const u = JSON.parse(raw) as AuthUser;
+        setUser({ ...u, role: u.role ?? "member" });
       } catch {
         /* ignore */
       }
@@ -67,21 +98,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn: (email, password, remember) => {
       const acc = readAccounts().find((a) => a.email.toLowerCase() === email.trim().toLowerCase());
       if (!acc || acc.password !== password) return "E-mail ou senha incorretos.";
-      persist({ name: acc.name, email: acc.email, skills: acc.skills }, remember);
+      const { password: _p, ...u } = acc;
+      persist(u, remember);
       return null;
     },
     signUp: (data) => {
       const list = readAccounts();
       if (list.some((a) => a.email.toLowerCase() === data.email.toLowerCase()))
         return "Já existe uma conta com este e-mail.";
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([...list, data]));
-      persist({ name: data.name, email: data.email, skills: data.skills }, true);
+      const acc: MockAccount = { ...data, role: "member" };
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([...list, acc]));
+      persist({ name: acc.name, email: acc.email, skills: acc.skills, role: "member" }, true);
       return null;
     },
     signOut: () => {
       localStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem(SESSION_KEY);
       setUser(null);
+    },
+    testAs: (role) => {
+      const seed = SEEDS.find((a) => a.role === role)!;
+      const { password: _p, ...u } = seed;
+      persist(u, true);
     },
   };
 
