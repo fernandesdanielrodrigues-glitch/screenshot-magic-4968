@@ -65,7 +65,7 @@ function EquipePage() {
           <div className="flex shrink-0 gap-2">
             <button
               onClick={() => setMemberModal({ mode: "create" })}
-              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
             >
               + Novo Membro
             </button>
