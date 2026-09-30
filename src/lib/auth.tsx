@@ -1,22 +1,31 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import type { Skill } from "./mock-data";
 
+export type Role = "admin" | "leader" | "member";
+
 export interface AuthUser {
+  profileId: string | null;
   name: string;
   email: string;
   skills: Skill[];
   role: Role;
+  realRole: Role;
   leaderOf?: Skill | undefined;
 }
-
-export type Role = "admin" | "leader" | "member";
 
 export function homeFor(role: Role) {
   return role === "member" ? "/minha-agenda" : "/";
 }
 
+const PUBLIC = ["/login", "/reset-password"];
+export function isPublic(path: string) {
+  return PUBLIC.includes(path);
+}
+
 export function canAccess(role: Role, path: string) {
-  if (path === "/login" || path === "/perfil" || path === "/minha-agenda") return true;
+  if (isPublic(path) || path === "/perfil" || path === "/minha-agenda") return true;
   if (role === "admin") return true;
   if (role === "leader") return ["/", "/dashboard", "/equipe", "/escalas/nova", "/calendario"].includes(path);
   return false;
@@ -28,98 +37,110 @@ export function roleLabel(u: AuthUser) {
   return "Membro";
 }
 
-interface MockAccount extends AuthUser {
-  password: string;
-}
-
 interface AuthCtx {
   user: AuthUser | null;
   ready: boolean;
-  signIn: (email: string, password: string, remember: boolean) => string | null;
-  signUp: (data: Omit<MockAccount, "role">) => string | null;
-  signOut: () => void;
-  testAs: (role: Role) => void;
+  signIn: (email: string, password: string) => Promise<string | null>;
+  signUp: (d: { name: string; email: string; password: string; skills: Skill[] }) => Promise<string | null>;
+  resetPassword: (email: string) => Promise<string | null>;
+  signOut: () => Promise<void>;
+  testAs: (role: Role | null) => void;
 }
 
-const ACCOUNTS_KEY = "syncmidia-accounts";
-const SESSION_KEY = "syncmidia-session";
-const DEMO: MockAccount = {
-  name: "Marina Alves",
-  email: "marina@syncmidia.app",
-  password: "123456",
-  skills: ["Slide", "Social"],
-  role: "admin",
-};
-const SEEDS: MockAccount[] = [
-  DEMO,
-  { name: "Rafael Souza", email: "rafael@syncmidia.app", password: "123456", skills: ["Câmera"], role: "leader", leaderOf: "Câmera" },
-  { name: "Juliana Prado", email: "juliana@syncmidia.app", password: "123456", skills: ["Slide", "Telão"], role: "member" },
-];
-
+const TEST_KEY = "syncmidia-test-role";
 const Ctx = createContext<AuthCtx | null>(null);
 
-function readAccounts(): MockAccount[] {
-  try {
-    const list = (JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "[]") as MockAccount[]).filter(
-      (a) => !SEEDS.some((s) => s.email === a.email),
-    );
-    return [...SEEDS, ...list.map((a) => ({ ...a, role: a.role ?? "member" }))];
-  } catch {
-    return SEEDS;
+function translate(msg: string) {
+  if (/invalid login/i.test(msg)) return "E-mail ou senha incorretos.";
+  if (/not confirmed/i.test(msg)) return "Confirme seu e-mail antes de entrar (verifique sua caixa de entrada).";
+  if (/already registered/i.test(msg)) return "Já existe uma conta com este e-mail.";
+  if (/pwned|leaked|weak/i.test(msg)) return "Essa senha é fraca ou já vazou em outro site. Escolha outra.";
+  return msg;
+}
+
+async function loadUser(uid: string, email: string): Promise<AuthUser> {
+  const [{ data: prof }, { data: roles }] = await Promise.all([
+    supabase.from("profiles").select("id, name, email, skills").eq("user_id", uid).maybeSingle(),
+    supabase.from("user_roles").select("role").eq("user_id", uid),
+  ]);
+  let leaderOf: Skill | undefined;
+  if (prof) {
+    const { data: sec } = await supabase.from("sectors").select("name").eq("leader_id", prof.id).maybeSingle();
+    leaderOf = (sec?.name as Skill) ?? undefined;
   }
+  const rs = (roles ?? []).map((r) => r.role);
+  const realRole: Role = rs.includes("admin") ? "admin" : rs.includes("leader") || leaderOf ? "leader" : "member";
+  const test = typeof localStorage !== "undefined" ? (localStorage.getItem(TEST_KEY) as Role | null) : null;
+  return {
+    profileId: prof?.id ?? null,
+    name: prof?.name ?? email.split("@")[0]!,
+    email: prof?.email ?? email,
+    skills: (prof?.skills ?? []) as Skill[],
+    realRole,
+    role: test ?? realRole,
+    leaderOf: leaderOf ?? (test === "leader" ? "Câmera" : undefined),
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const qc = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
-    if (raw) {
-      try {
-        const u = JSON.parse(raw) as AuthUser;
-        setUser({ ...u, role: u.role ?? "member" });
-      } catch {
-        /* ignore */
-      }
-    }
+  const refresh = useCallback(async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) setUser(await loadUser(data.user.id, data.user.email ?? ""));
+    else setUser(null);
     setReady(true);
   }, []);
 
-  const persist = (u: AuthUser, remember: boolean) => {
-    const s = JSON.stringify(u);
-    (remember ? localStorage : sessionStorage).setItem(SESSION_KEY, s);
-    setUser(u);
-  };
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        setTimeout(() => {
+          void refresh();
+          if (event !== "SIGNED_OUT") qc.invalidateQueries();
+        }, 0);
+      }
+    });
+    void refresh();
+    return () => sub.subscription.unsubscribe();
+  }, [refresh, qc]);
 
   const value: AuthCtx = {
     user,
     ready,
-    signIn: (email, password, remember) => {
-      const acc = readAccounts().find((a) => a.email.toLowerCase() === email.trim().toLowerCase());
-      if (!acc || acc.password !== password) return "E-mail ou senha incorretos.";
-      const { password: _p, ...u } = acc;
-      persist(u, remember);
-      return null;
+    signIn: async (email, password) => {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      return error ? translate(error.message) : null;
     },
-    signUp: (data) => {
-      const list = readAccounts();
-      if (list.some((a) => a.email.toLowerCase() === data.email.toLowerCase()))
-        return "Já existe uma conta com este e-mail.";
-      const acc: MockAccount = { ...data, role: "member" };
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([...list, acc]));
-      persist({ name: acc.name, email: acc.email, skills: acc.skills, role: "member" }, true);
-      return null;
+    signUp: async ({ name, email, password, skills }) => {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { emailRedirectTo: window.location.origin, data: { name, skills } },
+      });
+      return error ? translate(error.message) : null;
     },
-    signOut: () => {
-      localStorage.removeItem(SESSION_KEY);
-      sessionStorage.removeItem(SESSION_KEY);
+    resetPassword: async (email) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      return error ? translate(error.message) : null;
+    },
+    signOut: async () => {
+      await qc.cancelQueries();
+      qc.clear();
+      localStorage.removeItem(TEST_KEY);
+      await supabase.auth.signOut();
       setUser(null);
     },
     testAs: (role) => {
-      const seed = SEEDS.find((a) => a.role === role)!;
-      const { password: _p, ...u } = seed;
-      persist(u, true);
+      if (!user) return;
+      if (role && role !== user.realRole) localStorage.setItem(TEST_KEY, role);
+      else localStorage.removeItem(TEST_KEY);
+      const r = role ?? user.realRole;
+      setUser({ ...user, role: r, leaderOf: user.leaderOf ?? (r === "leader" ? "Câmera" : undefined) });
     },
   };
 
