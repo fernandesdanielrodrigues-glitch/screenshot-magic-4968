@@ -16,6 +16,7 @@ import { Route as EquipeRouteImport } from './routes/equipe'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MinhaAgendaRouteImport } from './routes/minha-agenda'
 import { Route as PerfilRouteImport } from './routes/perfil'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as EscalasNovaRouteImport } from './routes/escalas.nova'
 
 const IndexRoute = IndexRouteImport.update({
@@ -53,6 +54,11 @@ const PerfilRoute = PerfilRouteImport.update({
   path: '/perfil',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EscalasNovaRoute = EscalasNovaRouteImport.update({
   id: '/escalas/nova',
   path: '/escalas/nova',
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/minha-agenda': typeof MinhaAgendaRoute
   '/perfil': typeof PerfilRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/escalas/nova': typeof EscalasNovaRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/minha-agenda': typeof MinhaAgendaRoute
   '/perfil': typeof PerfilRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/escalas/nova': typeof EscalasNovaRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/minha-agenda': typeof MinhaAgendaRoute
   '/perfil': typeof PerfilRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/escalas/nova': typeof EscalasNovaRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/minha-agenda'
     | '/perfil'
+    | '/reset-password'
     | '/escalas/nova'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/minha-agenda'
     | '/perfil'
+    | '/reset-password'
     | '/escalas/nova'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/minha-agenda'
     | '/perfil'
+    | '/reset-password'
     | '/escalas/nova'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MinhaAgendaRoute: typeof MinhaAgendaRoute
   PerfilRoute: typeof PerfilRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   EscalasNovaRoute: typeof EscalasNovaRoute
 }
 
@@ -185,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PerfilRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/escalas/nova': {
       id: '/escalas/nova'
       path: '/escalas/nova'
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MinhaAgendaRoute: MinhaAgendaRoute,
   PerfilRoute: PerfilRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   EscalasNovaRoute: EscalasNovaRoute,
 }
 export const routeTree = rootRouteImport
