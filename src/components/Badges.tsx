@@ -7,6 +7,7 @@ const skillStyles: Record<Skill, string> = {
   "Telão": "bg-primary/10 text-primary",
   "Câmera": "bg-accent/15 text-accent-foreground",
   Social: "bg-warning/15 text-warning-foreground",
+  Foto: "bg-destructive/10 text-destructive",
 };
 
 export function SkillTag({ skill, onClick, active }: { skill: Skill; onClick?: () => void; active?: boolean }) {

@@ -1,10 +1,11 @@
-export type Skill = "Slide" | "Telão" | "Câmera" | "Social";
+export type Skill = "Slide" | "Telão" | "Câmera" | "Social" | "Foto";
 export type UserRole = "admin" | "leader" | "member";
 export type UserStatus = "Ativo" | "Indisponível";
 export type ScheduleStatus = "confirmed" | "pending" | "declined" | "swap_requested";
 
 export interface User {
   id: string;
+  auth_id?: string | null;
   name: string;
   email: string;
   role: UserRole;
@@ -39,6 +40,7 @@ export interface Schedule {
   sector_name: Skill;
   role_label: string;
   status: ScheduleStatus;
+  swap_reason?: string | null;
 }
 
 export interface NotificationItem {
@@ -48,7 +50,7 @@ export interface NotificationItem {
   kind: "confirm" | "swap" | "leader" | "system";
 }
 
-export const SKILLS: Skill[] = ["Slide", "Telão", "Câmera", "Social"];
+export const SKILLS: Skill[] = ["Slide", "Telão", "Câmera", "Social", "Foto"];
 
 export const users: User[] = [
   {

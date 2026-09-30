@@ -27,7 +27,7 @@ const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "
 const EVENT_SUGGESTIONS = ["Culto de Domingo", "Culto de Quarta", "Encontro de Jovens", "Ensaio"];
 const pad = (n: number) => String(n).padStart(2, "0");
 const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const emptyAssign = (): Record<Skill, string[]> => ({ Slide: [], "Telão": [], "Câmera": [], Social: [] });
+const emptyAssign = (): Record<Skill, string[]> => ({ Slide: [], "Telão": [], "Câmera": [], Social: [], Foto: [] });
 
 function nextSundays(count: number) {
   const d = new Date();
