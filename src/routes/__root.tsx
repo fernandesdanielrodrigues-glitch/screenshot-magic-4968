@@ -8,12 +8,13 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "../lib/store";
 import { Toaster } from "@/components/ui/sonner";
-import { AuthProvider, canAccess, homeFor, useAuth } from "@/lib/auth";
+import { AuthProvider, canAccess, homeFor, isPublic, useAuth } from "@/lib/auth";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
 function AuthGate({ children }: { children: ReactNode }) {
@@ -21,14 +22,26 @@ function AuthGate({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isLogin = pathname === "/login";
+  const pub = isPublic(pathname);
   useEffect(() => {
     if (!ready) return;
-    if (!user && !isLogin) navigate({ to: "/login", replace: true });
+    if (!user && !pub) navigate({ to: "/login", replace: true });
     else if (user && (isLogin || !canAccess(user.role, pathname)))
       navigate({ to: homeFor(user.role), replace: true });
   }, [ready, user, isLogin, pathname, navigate]);
-  if (!isLogin && (!ready || !user || !canAccess(user.role, pathname))) return null;
+  if (!pub && (!ready || !user || !canAccess(user.role, pathname))) return null;
   return <>{children}</>;
+}
+
+function DataLayer() {
+  const { user } = useAuth();
+  return (
+    <StoreProvider enabled={!!user}>
+      <AuthGate>
+        <Outlet />
+      </AuthGate>
+    </StoreProvider>
+  );
 }
 
 function NotFoundComponent() {
@@ -53,7 +66,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -149,12 +162,8 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <StoreProvider>
-          <AuthGate>
-            <Outlet />
-          </AuthGate>
-          <Toaster position="top-center" richColors />
-        </StoreProvider>
+        <DataLayer />
+        <Toaster position="top-center" richColors />
       </AuthProvider>
     </QueryClientProvider>
   );

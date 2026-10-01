@@ -4,8 +4,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { StatusBadge } from "@/components/Badges";
-import { currentMember, formatLongDate, formatTime } from "@/lib/mock-data";
+import { formatLongDate, formatTime } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/minha-agenda")({
   head: () => ({
@@ -27,6 +28,8 @@ function MinhaAgenda() {
   const [reason, setReason] = useState(reasons[0]);
   const [substitute, setSubstitute] = useState("");
 
+  const { user } = useAuth();
+  const currentMember = user?.profileId ?? "";
   const me = userById(currentMember);
   const mine = schedules.filter((s) => s.user_id === currentMember);
 
@@ -62,7 +65,7 @@ function MinhaAgenda() {
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <button
                   onClick={() => {
-                    setScheduleStatus(s.id, "confirmed");
+                    void setScheduleStatus(s.id, "confirmed");
                     pushNotification(`${me?.name} confirmou presença em ${event?.title}.`, "confirm");
                     toast.success("Presença confirmada!");
                   }}
@@ -81,7 +84,7 @@ function MinhaAgenda() {
           );
         })}
         {mine.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground">Você não tem escalas no momento.</p>
+          <p className="text-center text-sm text-muted-foreground">{user?.profileId ? "Você não tem escalas no momento." : "Seu perfil ainda não está ligado à equipe. Peça a um líder para cadastrar seu e-mail."}</p>
         ) : null}
       </div>
 
@@ -131,7 +134,7 @@ function MinhaAgenda() {
               </button>
               <button
                 onClick={() => {
-                  setScheduleStatus(swapFor, "swap_requested");
+                  void setScheduleStatus(swapFor, "swap_requested", `${reason}${substitute ? ` · sugere ${users.find((u) => u.id === substitute)?.name}` : ""}`);
                   const sub = users.find((u) => u.id === substitute)?.name;
                   pushNotification(
                     `${me?.name} solicitou substituição (${reason})${sub ? ` sugerindo ${sub}` : ""}.`,

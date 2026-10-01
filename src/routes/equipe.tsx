@@ -21,7 +21,7 @@ export const Route = createFileRoute("/equipe")({
 });
 
 function EquipePage() {
-  const { users, schedules, events, nameLeaderOfSector, toggleMemberStatus, addMember, updateMember, setUserRole } = useStore();
+  const { users, schedules, events, nameLeaderOfSector, toggleMemberStatus, removeLeader, addMember, updateMember, setUserRole } = useStore();
   const { user: me } = useAuth();
   const isAdmin = me?.role === "admin";
   const leaderSector = me?.role === "leader" ? (me.leaderOf ?? null) : null;
@@ -140,6 +140,9 @@ function EquipePage() {
                       setLeaderModal(true);
                     },
                   },
+                  ...(u.is_leader_of_sector
+                    ? [{ label: "Remover Líder", action: () => { void removeLeader(u.id); toast.success(`${u.name} deixou a liderança.`); } }]
+                    : []),
                   {
                     label: "Editar Membro",
                     action: () => setMemberModal({ mode: "edit", userId: u.id }),
@@ -157,7 +160,7 @@ function EquipePage() {
                         }))
                     : []),
                   {
-                    label: u.status === "Ativo" ? "Desativar Membro" : "Reativar Membro",
+                    label: u.status === "Ativo" ? "Alterar Status → Indisponível" : "Alterar Status → Ativo",
                     action: () => {
                       toggleMemberStatus(u.id);
                       toast.success(`${u.name} atualizado(a).`);

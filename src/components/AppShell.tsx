@@ -110,7 +110,7 @@ export function AppShell({
                   <Smartphone className="h-4 w-4" /> Minha Agenda
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={signOut} className="text-destructive">
+                <DropdownMenuItem onSelect={() => void signOut()} className="text-destructive">
                   <LogOut className="h-4 w-4" /> Sair
                 </DropdownMenuItem>
               </DropdownMenuContent>
