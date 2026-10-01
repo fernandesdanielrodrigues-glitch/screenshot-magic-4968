@@ -1,3 +1,4 @@
 # Roadmap
-- [x] Equipe: criar/editar membros (modal, "+ Novo Membro", "Editar Membro")
-- [x] Criar Escala: atalhos de domingos, modal "+ Novo Evento" (sugestões, data/hora, recorrente), "+ Adicionar" por setor, "Copiar Escala Anterior", alerta de indisponibilidade
+- [x] Equipe: criar/editar membros
+- [x] Criar Escala: atalhos, novo evento, adicionar por setor, copiar anterior, indisponibilidade
+- [x] v2: setor Foto, login real (e-mail + Google), dados salvos no banco com atualização ao vivo
