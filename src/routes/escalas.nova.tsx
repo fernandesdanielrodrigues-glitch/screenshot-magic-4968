@@ -78,11 +78,11 @@ function NovaEscala() {
     setAddMenu(null);
   }
 
-  function selectSunday(d: Date) {
+  async function selectSunday(d: Date) {
     const key = toKey(d);
     const existing = events.find((e) => dateKey(e.date_time) === key);
     if (existing) { selectEvent(existing.id); return; }
-    const id = addEvent({ title: "Culto de Domingo", date_time: `${key}T10:00:00`, recurring: false });
+    const id = await addEvent({ title: "Culto de Domingo", date_time: `${key}T10:00:00`, recurring: false });
     setEventId(id);
     setAssignments(emptyAssign());
     toast.success(`Culto de Domingo (${pad(d.getDate())}/${MONTHS[d.getMonth()]}) criado.`);
@@ -211,8 +211,8 @@ function NovaEscala() {
             <Copy className="h-4 w-4" /> Copiar Escala Anterior
           </button>
           <button
-            onClick={() => {
-              publishSchedule(eventId, assignments);
+            onClick={async () => {
+              await publishSchedule(eventId, assignments);
               toast.success("Escala publicada. Equipa notificada.");
             }}
             className="ml-auto rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
@@ -351,8 +351,8 @@ function NovaEscala() {
       {eventModal ? (
         <NewEventModal
           onClose={() => setEventModal(false)}
-          onSave={(data) => {
-            const id = addEvent(data);
+          onSave={async (data) => {
+            const id = await addEvent(data);
             setEventId(id);
             setAssignments(emptyAssign());
             setEventModal(false);
