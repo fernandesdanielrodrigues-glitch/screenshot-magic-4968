@@ -195,7 +195,7 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
             end_time: end_time ?? null,
           };
         });
-        const { data: created, error } = await supabase.from("events").insert(rows).select("id").order("date_time");
+        const { data: created, error } = await supabase.from("events").insert(rows).select("id, date_time").order("date_time");
         check(error);
         await pushNotification(`Evento "${title}" criado${recurring ? " (recorrente, 4 semanas)" : ""}.`, "system");
         await refresh();
