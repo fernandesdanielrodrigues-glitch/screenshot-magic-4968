@@ -5,6 +5,7 @@ import { z } from "zod";
 import { useAuth } from "@/lib/auth";
 import { SKILLS, type Skill } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -30,7 +31,8 @@ const inputCls =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30";
 
 function LoginPage() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
+  const [busy, setBusy] = useState(false);
 
   const [tab, setTab] = useState<"in" | "up">("in");
   const [name, setName] = useState("");
@@ -40,19 +42,42 @@ function LoginPage() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setBusy(true);
+    try {
+      await doSubmit();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const google = async () => {
+    const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    if (r.error) setError("Não foi possível entrar com o Google.");
+  };
+
+  const forgot = async () => {
+    if (!email.trim()) return setError("Digite seu e-mail acima para receber o link.");
+    const err = await resetPassword(email);
+    if (err) return setError(err);
+    toast.success("Enviamos um link para redefinir sua senha.");
+  };
+
+  const doSubmit = async () => {
+    void remember;
     if (tab === "in") {
-      const err = signIn(email, password, remember);
+      const err = await signIn(email, password);
       if (err) return setError(err);
     } else {
       const parsed = signUpSchema.safeParse({ name, email, password });
       if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? "Dados inválidos");
       if (skills.length === 0) return setError("Selecione pelo menos uma competência.");
-      const err = signUp({ ...parsed.data, skills });
+      const err = await signUp({ ...parsed.data, skills });
       if (err) return setError(err);
-      toast.success("Conta criada com sucesso!");
+      toast.success("Conta criada! Confirme pelo link enviado ao seu e-mail.");
+      setTab("in");
     }
   };
 
@@ -135,7 +160,7 @@ function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => toast.info("No modo de teste não enviamos e-mails. Use a conta de demonstração.")}
+                  onClick={() => void forgot()}
                   className="font-medium text-accent hover:underline"
                 >
                   Esqueci minha senha
@@ -145,14 +170,21 @@ function LoginPage() {
 
             {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
 
-            <button type="submit" className="w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-accent/90">
+            <button type="submit" disabled={busy} className="w-full rounded-lg bg-accent disabled:opacity-60 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-accent/90">
               {tab === "in" ? "Entrar" : "Criar Conta"}
             </button>
           </form>
 
-          <p className="mt-5 rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground">
-            Modo de teste · demo: marina@syncmidia.app / 123456
-          </p>
+          <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" /> ou <span className="h-px flex-1 bg-border" />
+          </div>
+          <button
+            type="button"
+            onClick={() => void google()}
+            className="w-full rounded-lg border border-input py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted"
+          >
+            Continuar com Google
+          </button>
         </div>
       </div>
     </div>
