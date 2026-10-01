@@ -103,9 +103,11 @@ export type Database = {
       }
       schedules: {
         Row: {
+          confirmation_token: string
           created_at: string
           event_id: string
           id: string
+          notified_at: string | null
           profile_id: string
           role_label: string
           sector: Database["public"]["Enums"]["skill"]
@@ -113,9 +115,11 @@ export type Database = {
           swap_reason: string | null
         }
         Insert: {
+          confirmation_token?: string
           created_at?: string
           event_id: string
           id?: string
+          notified_at?: string | null
           profile_id: string
           role_label: string
           sector: Database["public"]["Enums"]["skill"]
@@ -123,9 +127,11 @@ export type Database = {
           swap_reason?: string | null
         }
         Update: {
+          confirmation_token?: string
           created_at?: string
           event_id?: string
           id?: string
+          notified_at?: string | null
           profile_id?: string
           role_label?: string
           sector?: Database["public"]["Enums"]["skill"]
@@ -221,6 +227,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_invite: {
+        Args: { _token: string }
+        Returns: {
+          event_date: string
+          event_title: string
+          leader_name: string
+          member_name: string
+          role_label: string
+          sector: string
+          status: string
+          swap_reason: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -230,6 +249,10 @@ export type Database = {
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       my_profile_id: { Args: never; Returns: string }
+      respond_invite: {
+        Args: { _action: string; _reason?: string; _token: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "leader" | "member"
