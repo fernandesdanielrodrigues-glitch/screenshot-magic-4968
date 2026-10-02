@@ -41,6 +41,8 @@ export interface Schedule {
   role_label: string;
   status: ScheduleStatus;
   swap_reason?: string | null;
+  confirmation_token?: string;
+  notified_at?: string | null;
 }
 
 export interface NotificationItem {
