@@ -45,7 +45,7 @@ function ConfirmPage() {
   async function respond(kind: "accept" | "swap", why?: string) {
     setBusy(true);
     setErr(null);
-    const { error } = await supabase.rpc("respond_invite", { _token: token, _action: kind, _reason: why ?? null });
+    const { error } = await supabase.rpc("respond_invite", { _token: token, _action: kind, _reason: why ?? "" });
     setBusy(false);
     if (error) return setErr("Não foi possível registrar sua resposta. Tente novamente.");
     setSwapOpen(false);
