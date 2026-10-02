@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { Avatar, SkillTag } from "@/components/Badges";
 import { SKILLS, dateKey, formatLongDate, formatTime, type Skill, type User } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
+import { buildMessage, type NotifyChannel } from "@/lib/notifications";
 
 export const Route = createFileRoute("/escalas/nova")({
   head: () => ({
@@ -60,6 +61,7 @@ function NovaEscala() {
   );
   const [eventModal, setEventModal] = useState(false);
   const [addMenu, setAddMenu] = useState<Skill | null>(null);
+  const [publishOpen, setPublishOpen] = useState(false);
 
   const event = events.find((e) => e.id === eventId);
   const eventDay = event ? dateKey(event.date_time) : "";
@@ -211,10 +213,7 @@ function NovaEscala() {
             <Copy className="h-4 w-4" /> Copiar Escala Anterior
           </button>
           <button
-            onClick={async () => {
-              await publishSchedule(eventId, assignments);
-              toast.success("Escala publicada. Equipa notificada.");
-            }}
+            onClick={() => setPublishOpen(true)}
             className="ml-auto rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
           >
             Publicar Escala
@@ -348,6 +347,27 @@ function NovaEscala() {
         </div>
       </div>
 
+      {publishOpen && event ? (
+        <PublishModal
+          eventTitle={event.title}
+          when={`${formatLongDate(event.date_time)} às ${formatTime(event.date_time)}`}
+          sample={(() => {
+            const sec = SKILLS.find((x) => assignments[x].length);
+            const u = sec ? users.find((x) => x.id === assignments[sec][0]) : undefined;
+            const tok = sec ? schedules.find((x) => x.event_id === eventId && x.user_id === u?.id)?.confirmation_token : undefined;
+            return { name: u?.name.split(" ")[0] ?? "[Nome]", sector: sec ?? "[Setor]", token: tok ?? "[TOKEN]" };
+          })()}
+          count={assignedIds.size}
+          onClose={() => setPublishOpen(false)}
+          onConfirm={async (channels) => {
+            const n = await publishSchedule(eventId, assignments, channels.length > 0);
+            setPublishOpen(false);
+            const sent = n * channels.length;
+            toast.success(channels.length ? `Escala publicada e ${sent} notificações enviadas!` : "Escala publicada.");
+          }}
+        />
+      ) : null}
+
       {eventModal ? (
         <NewEventModal
           onClose={() => setEventModal(false)}
@@ -447,6 +467,53 @@ function NewEventModal({
           </button>
           <button onClick={save} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
             Criar evento
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PublishModal({
+  eventTitle, when, sample, count, onClose, onConfirm,
+}: {
+  eventTitle: string;
+  when: string;
+  sample: { name: string; sector: string; token: string };
+  count: number;
+  onClose: () => void;
+  onConfirm: (channels: NotifyChannel[]) => Promise<void>;
+}) {
+  const [wa, setWa] = useState(true);
+  const [mail, setMail] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const msg = buildMessage({ ...sample, event: eventTitle, when });
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-xl bg-card p-6 shadow-card">
+        <h2 className="text-lg font-semibold text-foreground">Publicar Escala e Notificar</h2>
+        <p className="text-sm text-muted-foreground">{count} membro(s) escalado(s) em {eventTitle}.</p>
+        <div className="mt-4 space-y-2">
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} className="h-4 w-4 accent-primary" /> Enviar Notificação via WhatsApp
+          </label>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input type="checkbox" checked={mail} onChange={(e) => setMail(e.target.checked)} className="h-4 w-4 accent-primary" /> Enviar via E-mail
+          </label>
+        </div>
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prévia da mensagem</p>
+        <pre className="mt-1 whitespace-pre-wrap break-words rounded-lg bg-secondary p-3 font-sans text-sm text-secondary-foreground">{msg}</pre>
+        <div className="mt-6 flex gap-2">
+          <button onClick={onClose} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold text-secondary-foreground">Cancelar</button>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try { await onConfirm([...(wa ? ["whatsapp" as const] : []), ...(mail ? ["email" as const] : [])]); } finally { setBusy(false); }
+            }}
+            className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-60"
+          >
+            Confirmar e Enviar
           </button>
         </div>
       </div>

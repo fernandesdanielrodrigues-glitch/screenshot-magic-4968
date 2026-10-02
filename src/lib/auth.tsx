@@ -21,7 +21,7 @@ export function homeFor(role: Role) {
 
 const PUBLIC = ["/login", "/reset-password"];
 export function isPublic(path: string) {
-  return PUBLIC.includes(path);
+  return PUBLIC.includes(path) || path.startsWith("/confirmar/");
 }
 
 export function canAccess(role: Role, path: string) {

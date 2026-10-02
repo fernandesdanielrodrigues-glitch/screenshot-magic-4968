@@ -33,7 +33,8 @@ interface StoreValue {
   setUserRole: (userId: string, role: User["role"]) => Promise<void>;
   toggleMemberStatus: (userId: string) => Promise<void>;
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus, reason?: string) => Promise<void>;
-  publishSchedule: (eventId: string, assignments: Record<Skill, string[]>) => Promise<void>;
+  publishSchedule: (eventId: string, assignments: Record<Skill, string[]>, notify?: boolean) => Promise<number>;
+  markNotified: (scheduleId: string) => Promise<void>;
   pushNotification: (message: string, kind: NotificationItem["kind"]) => Promise<void>;
   addEvent: (data: {
     title: string;
@@ -115,6 +116,8 @@ async function fetchAll() {
     role_label: x.role_label,
     status: x.status as ScheduleStatus,
     swap_reason: x.swap_reason,
+    confirmation_token: x.confirmation_token,
+    notified_at: x.notified_at,
   }));
 
   const notifications: NotificationItem[] = (n.data ?? []).map((x) => ({
@@ -270,9 +273,14 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
         check(error);
         refresh();
       },
-      publishSchedule: async (eventId, assignments) => {
+      markNotified: async (scheduleId) => {
+        const { error } = await supabase.from("schedules").update({ notified_at: new Date().toISOString() }).eq("id", scheduleId);
+        check(error);
+      },
+      publishSchedule: async (eventId, assignments, notify = false) => {
         const prev = schedules.filter((s) => s.event_id === eventId);
-        const rows: { event_id: string; profile_id: string; sector: Skill; role_label: string; status: string }[] = [];
+        const now = new Date().toISOString();
+        const rows: { event_id: string; profile_id: string; sector: Skill; role_label: string; status: string; notified_at: string | null; confirmation_token?: string }[] = [];
         (Object.keys(assignments) as Skill[]).forEach((sector) => {
           assignments[sector].forEach((userId, index) => {
             const old = prev.find((s) => s.user_id === userId && s.sector_name === sector);
@@ -281,7 +289,9 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
               profile_id: userId,
               sector,
               role_label: sector === "Câmera" ? `Câmera ${index + 1}` : sector === "Social" ? "Redes Sociais" : sector,
-              status: old?.status ?? "pending",
+              status: notify ? "pending" : old?.status ?? "pending",
+              notified_at: notify ? now : old?.notified_at ?? null,
+              ...(old?.confirmation_token ? { confirmation_token: old.confirmation_token } : {}),
             });
           });
         });
@@ -292,7 +302,8 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
           check(error);
         }
         const title = events.find((e) => e.id === eventId)?.title ?? "Evento";
-        await pushNotification(`Escala de ${title} publicada e notificações enviadas.`, "system");
+        await pushNotification(notify ? `Escala de ${title} publicada e ${rows.length} notificações enviadas.` : `Escala de ${title} salva.`, "system");
+        return rows.length;
       },
     };
   }, [data, isLoading, qc]);
