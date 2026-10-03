@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS calendar_token uuid NOT NULL DEFAULT gen_random_uuid();
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_calendar_token_idx ON public.profiles(calendar_token);

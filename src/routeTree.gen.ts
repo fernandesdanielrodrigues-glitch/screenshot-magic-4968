@@ -19,6 +19,7 @@ import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ConfirmarTokenRouteImport } from './routes/confirmar.$token'
 import { Route as EscalasNovaRouteImport } from './routes/escalas.nova'
+import { Route as ApiPublicAgendaTokenRouteImport } from './routes/api/public/agenda.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -70,6 +71,11 @@ const EscalasNovaRoute = EscalasNovaRouteImport.update({
   path: '/escalas/nova',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAgendaTokenRoute = ApiPublicAgendaTokenRouteImport.update({
+  id: '/api/public/agenda/$token',
+  path: '/api/public/agenda/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/confirmar/$token': typeof ConfirmarTokenRoute
   '/escalas/nova': typeof EscalasNovaRoute
+  '/api/public/agenda/$token': typeof ApiPublicAgendaTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/confirmar/$token': typeof ConfirmarTokenRoute
   '/escalas/nova': typeof EscalasNovaRoute
+  '/api/public/agenda/$token': typeof ApiPublicAgendaTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/confirmar/$token': typeof ConfirmarTokenRoute
   '/escalas/nova': typeof EscalasNovaRoute
+  '/api/public/agenda/$token': typeof ApiPublicAgendaTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/confirmar/$token'
     | '/escalas/nova'
+    | '/api/public/agenda/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/confirmar/$token'
     | '/escalas/nova'
+    | '/api/public/agenda/$token'
   id:
     | '__root__'
     | '/'
@@ -145,6 +156,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/confirmar/$token'
     | '/escalas/nova'
+    | '/api/public/agenda/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -158,6 +170,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ConfirmarTokenRoute: typeof ConfirmarTokenRoute
   EscalasNovaRoute: typeof EscalasNovaRoute
+  ApiPublicAgendaTokenRoute: typeof ApiPublicAgendaTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -232,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EscalasNovaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/agenda/$token': {
+      id: '/api/public/agenda/$token'
+      path: '/api/public/agenda/$token'
+      fullPath: '/api/public/agenda/$token'
+      preLoaderRoute: typeof ApiPublicAgendaTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -246,6 +266,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ConfirmarTokenRoute: ConfirmarTokenRoute,
   EscalasNovaRoute: EscalasNovaRoute,
+  ApiPublicAgendaTokenRoute: ApiPublicAgendaTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
