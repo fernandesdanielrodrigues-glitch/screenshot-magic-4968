@@ -13,7 +13,7 @@ type View = "list" | "calendar";
 
 export const Route = createFileRoute("/minha-agenda")({
   validateSearch: (s: Record<string, unknown>): { view?: View } =>
-    s.view === "calendar" ? { view: "calendar" } : s.view === "list" ? { view: "list" } : {},
+    s["view"] === "calendar" ? { view: "calendar" } : s["view"] === "list" ? { view: "list" } : {},
   head: () => ({
     meta: [
       { title: "Minha Agenda — SyncMídia" },
@@ -37,7 +37,7 @@ const todayKey = () => {
   return keyOf(t.getFullYear(), t.getMonth(), t.getDate());
 };
 function labelFor(key: string) {
-  const [y, m, d] = key.split("-").map(Number);
+  const [y = 0, m = 1, d = 1] = key.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   const diff = Math.round((dt.getTime() - new Date(new Date().toDateString()).getTime()) / 86400000);
   const base = dt.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
