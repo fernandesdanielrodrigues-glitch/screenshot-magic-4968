@@ -1,4 +1,4 @@
-export type IcsItem = { id: string; title: string; date_time: string; end_time?: string | null; description?: string | null; role?: string };
+export type IcsItem = { id: string; title: string; date_time: string; end_time?: string | null | undefined; description?: string | null | undefined; role?: string | undefined };
 
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 const stamp = (dt: string) => dt.slice(0, 19).replace(/[-:]/g, "");

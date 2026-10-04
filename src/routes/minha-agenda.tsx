@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Ban, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Clock, List, UserCircle2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Ban, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Clock, Download, List, UserCircle2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { buildIcs, googleLink } from "@/lib/ics";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { StatusBadge } from "@/components/Badges";
@@ -61,6 +63,24 @@ function MinhaAgenda() {
   const [substitute, setSubstitute] = useState("");
   const [dayOpen, setDayOpen] = useState<string | null>(null);
   const [unavOpen, setUnavOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => {
+    if (!syncOpen || !me || token) return;
+    void supabase.from("profiles").select("calendar_token").eq("id", me).maybeSingle().then(({ data }) => setToken(data?.calendar_token ?? null));
+  }, [syncOpen, me, token]);
+  const feedUrl = token && typeof window !== "undefined" ? `${window.location.origin}/api/public/agenda/${token}.ics` : "";
+  const toItem = (s: Schedule, e: { id: string; title: string; date_time: string; end_time?: string | null | undefined; description?: string | null | undefined }) => ({
+    id: s.id, title: e.title, date_time: e.date_time, end_time: e.end_time, description: e.description, role: s.role_label,
+  });
+  const downloadIcs = () => {
+    const ics = buildIcs(upcoming.map(({ s, e }) => toItem(s, e!)));
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "minha-agenda-syncmidia.ics"; a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Arquivo de calendário baixado.");
+  };
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
 
@@ -115,6 +135,14 @@ function MinhaAgenda() {
           </p>
           <StatusBadge status={s.status} />
         </div>
+        <a
+          href={googleLink(toItem(s, e))}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+        >
+          <CalendarPlus className="h-3.5 w-3.5" /> Adicionar ao Google Calendar
+        </a>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <button
             onClick={() => accept(s, e.title)}
@@ -166,13 +194,22 @@ function MinhaAgenda() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setUnavOpen(true)}
-            disabled={!me}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
-          >
-            <CalendarPlus className="h-4 w-4" /> Informar Indisponibilidade
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSyncOpen(true)}
+              disabled={!me}
+              className="flex items-center gap-2 rounded-lg border border-input bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" /> Exportar / Sincronizar
+            </button>
+            <button
+              onClick={() => setUnavOpen(true)}
+              disabled={!me}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+            >
+              <CalendarPlus className="h-4 w-4" /> Informar Indisponibilidade
+            </button>
+          </div>
         </div>
 
         {view === "list" ? (
@@ -306,6 +343,32 @@ function MinhaAgenda() {
             })}
           </div>
           <button onClick={() => setUnavOpen(false)} className="mt-5 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground hover:opacity-90">Concluir</button>
+        </Modal>
+      ) : null}
+
+      {syncOpen ? (
+        <Modal onClose={() => setSyncOpen(false)}>
+          <h2 className="text-lg font-semibold text-foreground">Exportar / Sincronizar agenda</h2>
+          <div className="mt-4 space-y-5 text-sm">
+            <section>
+              <h3 className="font-semibold text-foreground">Sincronizar automaticamente</h3>
+              <p className="mt-1 text-muted-foreground">Assine este link no seu calendário. Novas escalas aparecem sozinhas (o Google atualiza a cada poucas horas).</p>
+              <input readOnly value={feedUrl || "Carregando…"} onFocus={(ev) => ev.target.select()} className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-xs" />
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <button disabled={!feedUrl} onClick={() => { void navigator.clipboard.writeText(feedUrl); toast.success("Link copiado!"); }} className="rounded-lg border border-input px-3 py-2 font-semibold hover:bg-secondary disabled:opacity-50">Copiar link</button>
+                <a aria-disabled={!feedUrl} href={feedUrl ? `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(feedUrl.replace(/^https?:/, "webcal:"))}` : undefined} target="_blank" rel="noreferrer" className="rounded-lg bg-accent px-3 py-2 text-center font-semibold text-accent-foreground hover:opacity-90">Google Calendar</a>
+                <a href={feedUrl ? feedUrl.replace(/^https?:/, "webcal:") : undefined} className="rounded-lg border border-input px-3 py-2 text-center font-semibold hover:bg-secondary">Apple / Outlook</a>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Não compartilhe este link — quem tiver ele vê suas escalas.</p>
+            </section>
+            <section>
+              <h3 className="font-semibold text-foreground">Exportar uma vez</h3>
+              <p className="mt-1 text-muted-foreground">Baixe um arquivo .ics com suas próximas escalas e importe em qualquer calendário.</p>
+              <button onClick={downloadIcs} disabled={!upcoming.length} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+                <Download className="h-4 w-4" /> Baixar arquivo (.ics)
+              </button>
+            </section>
+          </div>
         </Modal>
       ) : null}
 
