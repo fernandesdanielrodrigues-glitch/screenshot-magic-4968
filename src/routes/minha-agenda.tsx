@@ -70,7 +70,7 @@ function MinhaAgenda() {
     void supabase.from("profiles").select("calendar_token").eq("id", me).maybeSingle().then(({ data }) => setToken(data?.calendar_token ?? null));
   }, [syncOpen, me, token]);
   const feedUrl = token && typeof window !== "undefined" ? `${window.location.origin}/api/public/agenda/${token}.ics` : "";
-  const toItem = (s: Schedule, e: { id: string; title: string; date_time: string; end_time?: string | null; description?: string | null }) => ({
+  const toItem = (s: Schedule, e: { id: string; title: string; date_time: string; end_time?: string | null | undefined; description?: string | null | undefined }) => ({
     id: s.id, title: e.title, date_time: e.date_time, end_time: e.end_time, description: e.description, role: s.role_label,
   });
   const downloadIcs = () => {
