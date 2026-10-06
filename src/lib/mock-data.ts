@@ -8,6 +8,7 @@ export interface User {
   auth_id?: string | null;
   name: string;
   email: string;
+  phone: string | null;
   role: UserRole;
   skills: Skill[];
   is_leader_of_sector: string | null;
