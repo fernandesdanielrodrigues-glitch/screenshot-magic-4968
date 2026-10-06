@@ -62,19 +62,19 @@ function PerfilPage() {
   if (!user) return null;
 
   const saveAvatar = async (url: string | null) => {
-    if (!user.profileId) return toast.error("Seu perfil ainda não está vinculado.");
+    if (!user.profileId) { toast.error("Seu perfil ainda não está vinculado."); return; }
     setSavingAvatar(true);
     const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.profileId);
     setSavingAvatar(false);
-    if (error) return toast.error("Não foi possível salvar a foto: " + error.message);
+    if (error) { toast.error("Não foi possível salvar a foto: " + error.message); return; }
     await refresh();
     toast.success(url ? "Foto atualizada!" : "Foto removida.");
   };
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
-    if (!f.type.startsWith("image/")) return toast.error("Escolha um arquivo de imagem.");
-    if (f.size > 8 * 1024 * 1024) return toast.error("Imagem muito grande (máx. 8 MB).");
+    if (!f.type.startsWith("image/")) { toast.error("Escolha um arquivo de imagem."); return; }
+    if (f.size > 8 * 1024 * 1024) { toast.error("Imagem muito grande (máx. 8 MB)."); return; }
     try {
       await saveAvatar(await resizeImage(f));
     } catch {
@@ -84,19 +84,19 @@ function PerfilPage() {
 
   const savePhone = async () => {
     const v = phone.trim();
-    if (v && !PHONE_RE.test(v)) return toast.error("Telefone inválido. Ex.: +55 11 99999-0000");
-    if (!user.profileId) return toast.error("Seu perfil ainda não está vinculado.");
+    if (v && !PHONE_RE.test(v)) { toast.error("Telefone inválido. Ex.: +55 11 99999-0000"); return; }
+    if (!user.profileId) { toast.error("Seu perfil ainda não está vinculado."); return; }
     setSavingPhone(true);
     const { error } = await supabase.from("profiles").update({ phone: v || null }).eq("id", user.profileId);
     setSavingPhone(false);
-    if (error) return toast.error("Não foi possível salvar: " + error.message);
+    if (error) { toast.error("Não foi possível salvar: " + error.message); return; }
     await refresh();
     toast.success("Telefone atualizado!");
   };
 
   const savePassword = async () => {
-    if (pw.length < 6) return toast.error("A senha deve ter pelo menos 6 caracteres.");
-    if (pw !== pw2) return toast.error("As senhas não coincidem.");
+    if (pw.length < 6) { toast.error("A senha deve ter pelo menos 6 caracteres."); return; }
+    if (pw !== pw2) { toast.error("As senhas não coincidem."); return; }
     setSavingPw(true);
     const { error } = await supabase.auth.updateUser({ password: pw });
     setSavingPw(false);
@@ -106,7 +106,7 @@ function PerfilPage() {
         : /different from the old/i.test(error.message)
           ? "A nova senha deve ser diferente da atual."
           : error.message;
-      return toast.error(m);
+      { toast.error(m); return; }
     }
     setPw("");
     setPw2("");
