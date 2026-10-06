@@ -102,6 +102,7 @@ function EquipePage() {
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-foreground">{u.name}</p>
                   <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                  {u.phone ? <p className="truncate text-xs text-muted-foreground">{u.phone}</p> : null}
                 </div>
               </div>
               <button
@@ -272,6 +273,7 @@ function EquipePage() {
 interface MemberFormData {
   name: string;
   email: string;
+  phone: string | null;
   skills: Skill[];
   status: "Ativo" | "Indisponível";
   leaderOf: Skill | null;
@@ -288,6 +290,7 @@ function MemberModal({
 }) {
   const [name, setName] = useState(editing?.name ?? "");
   const [email, setEmail] = useState(editing?.email ?? "");
+  const [phone, setPhone] = useState(editing?.phone ?? "");
   const [skills, setSkills] = useState<Skill[]>(editing?.skills ?? []);
   const [status, setStatus] = useState<"Ativo" | "Indisponível">(editing?.status ?? "Ativo");
   const [leaderOf, setLeaderOf] = useState<Skill | null>((editing?.is_leader_of_sector as Skill | null) ?? null);
@@ -302,7 +305,10 @@ function MemberModal({
     if (!trimmedName) return setError("Informe o nome completo.");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) return setError("Informe um e-mail válido.");
     if (skills.length === 0) return setError("Selecione ao menos uma competência.");
-    onSave({ name: trimmedName.slice(0, 100), email: trimmedEmail.slice(0, 255), skills, status, leaderOf });
+    const trimmedPhone = phone.trim();
+    if (trimmedPhone && !/^\+?[\d\s()-]{8,20}$/.test(trimmedPhone))
+      return setError("Informe um telefone válido (ex.: +55 11 99999-0000).");
+    onSave({ name: trimmedName.slice(0, 100), email: trimmedEmail.slice(0, 255), phone: trimmedPhone || null, skills, status, leaderOf });
   };
 
   return (
@@ -321,6 +327,15 @@ function MemberModal({
         value={email}
         onChange={(e) => setEmail(e.target.value.slice(0, 255))}
         placeholder="ana@exemplo.com"
+        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+      />
+
+      <label className="mt-4 block text-sm font-medium text-foreground">Telefone / WhatsApp (opcional)</label>
+      <input
+        type="tel"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value.slice(0, 20))}
+        placeholder="+55 11 99999-0000"
         className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
       />
 
