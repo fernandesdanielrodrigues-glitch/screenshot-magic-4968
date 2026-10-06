@@ -8,6 +8,7 @@ export interface User {
   auth_id?: string | null;
   name: string;
   email: string;
+  phone: string | null;
   role: UserRole;
   skills: Skill[];
   is_leader_of_sector: string | null;
@@ -59,6 +60,7 @@ export const users: User[] = [
     id: "u1",
     name: "Marina Alves",
     email: "marina@syncmidia.app",
+    phone: null,
     role: "admin",
     skills: ["Slide", "Social"],
     is_leader_of_sector: null,
@@ -70,6 +72,7 @@ export const users: User[] = [
     id: "u2",
     name: "Rafael Souza",
     email: "rafael@syncmidia.app",
+    phone: null,
     role: "leader",
     skills: ["Câmera", "Telão"],
     is_leader_of_sector: "Câmera",
@@ -81,6 +84,7 @@ export const users: User[] = [
     id: "u3",
     name: "Beatriz Lima",
     email: "beatriz@syncmidia.app",
+    phone: null,
     role: "leader",
     skills: ["Slide"],
     is_leader_of_sector: "Slide",
@@ -92,6 +96,7 @@ export const users: User[] = [
     id: "u4",
     name: "Diego Martins",
     email: "diego@syncmidia.app",
+    phone: null,
     role: "member",
     skills: ["Telão", "Slide"],
     is_leader_of_sector: null,
@@ -103,6 +108,7 @@ export const users: User[] = [
     id: "u5",
     name: "Carolina Reis",
     email: "carolina@syncmidia.app",
+    phone: null,
     role: "member",
     skills: ["Social"],
     is_leader_of_sector: null,
@@ -114,6 +120,7 @@ export const users: User[] = [
     id: "u6",
     name: "Tiago Ferreira",
     email: "tiago@syncmidia.app",
+    phone: null,
     role: "member",
     skills: ["Câmera"],
     is_leader_of_sector: null,
@@ -125,6 +132,7 @@ export const users: User[] = [
     id: "u7",
     name: "Juliana Prado",
     email: "juliana@syncmidia.app",
+    phone: null,
     role: "member",
     skills: ["Câmera", "Social"],
     is_leader_of_sector: null,
@@ -136,6 +144,7 @@ export const users: User[] = [
     id: "u8",
     name: "Lucas Moreira",
     email: "lucas@syncmidia.app",
+    phone: null,
     role: "member",
     skills: ["Telão"],
     is_leader_of_sector: null,
@@ -147,6 +156,7 @@ export const users: User[] = [
     id: "u9",
     name: "Paula Nogueira",
     email: "paula@syncmidia.app",
+    phone: null,
     role: "leader",
     skills: ["Social", "Slide"],
     is_leader_of_sector: "Social",

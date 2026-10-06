@@ -15,6 +15,7 @@ import type {
 type MemberInput = {
   name: string;
   email: string;
+  phone?: string | null;
   skills: Skill[];
   status: User["status"];
   leaderOf?: Skill | null;
@@ -90,6 +91,7 @@ async function fetchAll() {
       auth_id: x.user_id,
       name: x.name,
       email: x.email,
+      phone: x.phone,
       role,
       skills: (x.skills ?? []) as Skill[],
       is_leader_of_sector: leads,
@@ -207,7 +209,7 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
       addMember: async (d) => {
         const { data: row, error } = await supabase
           .from("profiles")
-          .insert({ name: d.name, email: d.email.trim().toLowerCase(), skills: d.skills, status: d.status })
+          .insert({ name: d.name, email: d.email.trim().toLowerCase(), phone: d.phone?.trim() || null, skills: d.skills, status: d.status })
           .select("id")
           .single();
         check(error);
@@ -217,7 +219,7 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
       updateMember: async (userId, d) => {
         const { error } = await supabase
           .from("profiles")
-          .update({ name: d.name, email: d.email.trim().toLowerCase(), skills: d.skills, status: d.status })
+          .update({ name: d.name, email: d.email.trim().toLowerCase(), phone: d.phone?.trim() || null, skills: d.skills, status: d.status })
           .eq("id", userId);
         check(error);
         await setLeader(userId, d.leaderOf);
