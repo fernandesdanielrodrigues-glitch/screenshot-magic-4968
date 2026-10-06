@@ -8,6 +8,7 @@ export type Role = "admin" | "leader" | "member";
 export interface AuthUser {
   profileId: string | null;
   phone: string | null;
+  avatarUrl: string | null;
   name: string;
   email: string;
   skills: Skill[];
@@ -46,6 +47,7 @@ interface AuthCtx {
   resetPassword: (email: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   testAs: (role: Role | null) => void;
+  refresh: () => Promise<void>;
 }
 
 const TEST_KEY = "syncmidia-test-role";
@@ -61,7 +63,7 @@ function translate(msg: string) {
 
 async function loadUser(uid: string, email: string): Promise<AuthUser> {
   const [{ data: prof }, { data: roles }] = await Promise.all([
-    supabase.from("profiles").select("id, name, email, phone, skills").eq("user_id", uid).maybeSingle(),
+    supabase.from("profiles").select("id, name, email, phone, skills, avatar_url").eq("user_id", uid).maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", uid),
   ]);
   let leaderOf: Skill | undefined;
@@ -75,6 +77,7 @@ async function loadUser(uid: string, email: string): Promise<AuthUser> {
   return {
     profileId: prof?.id ?? null,
     phone: prof?.phone ?? null,
+    avatarUrl: prof?.avatar_url ?? null,
     name: prof?.name ?? email.split("@")[0]!,
     email: prof?.email ?? email,
     skills: (prof?.skills ?? []) as Skill[],
@@ -112,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthCtx = {
     user,
     ready,
+    refresh,
     signIn: async (email, password) => {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       return error ? translate(error.message) : null;
