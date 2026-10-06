@@ -28,6 +28,7 @@ function PerfilPage() {
           <div className="min-w-0">
             <p className="truncate text-lg font-bold text-foreground">{user.name}</p>
             <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+            {user.phone ? <p className="truncate text-sm text-muted-foreground">{user.phone}</p> : null}
             <span className="mt-1 inline-block rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
               {roleLabel(user)}
             </span>
