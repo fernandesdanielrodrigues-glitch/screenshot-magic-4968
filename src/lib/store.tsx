@@ -21,8 +21,25 @@ type MemberInput = {
   leaderOf?: Skill | null;
 };
 
+export interface Team {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  leader_id: string | null;
+  status: "active" | "inactive";
+  members: { user_id: string; sector: Skill }[];
+}
+export type TeamInput = Omit<Team, "id" | "status">;
+
 interface StoreValue {
   loading: boolean;
+  teams: Team[];
+  eventTeams: Record<string, string>;
+  teamOfUser: (userId: string) => Team | undefined;
+  saveTeam: (id: string | null, data: TeamInput) => Promise<void>;
+  deleteTeam: (id: string) => Promise<void>;
+  setEventTeam: (eventId: string, teamId: string | null) => Promise<void>;
   users: User[];
   sectors: Sector[];
   events: AppEvent[];
@@ -34,7 +51,7 @@ interface StoreValue {
   setUserRole: (userId: string, role: User["role"]) => Promise<void>;
   toggleMemberStatus: (userId: string) => Promise<void>;
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus, reason?: string) => Promise<void>;
-  publishSchedule: (eventId: string, assignments: Record<Skill, string[]>, notify?: boolean) => Promise<number>;
+  publishSchedule: (eventId: string, assignments: Record<Skill, string[]>, notify?: boolean, teamId?: string | null) => Promise<number>;
   markNotified: (scheduleId: string) => Promise<void>;
   pushNotification: (message: string, kind: NotificationItem["kind"]) => Promise<void>;
   addEvent: (data: {
@@ -62,7 +79,7 @@ function relTime(iso: string) {
 }
 
 async function fetchAll() {
-  const [p, r, s, e, sc, u, n] = await Promise.all([
+  const [p, r, s, e, sc, u, n, t, tm, et] = await Promise.all([
     supabase.from("profiles").select("*").order("name"),
     supabase.from("user_roles").select("user_id, role"),
     supabase.from("sectors").select("*"),
@@ -70,8 +87,11 @@ async function fetchAll() {
     supabase.from("schedules").select("*").order("created_at"),
     supabase.from("unavailability").select("*"),
     supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(20),
+    supabase.from("teams").select("*").order("name"),
+    supabase.from("team_members").select("*"),
+    supabase.from("event_teams").select("*"),
   ]);
-  const err = [p, r, s, e, sc, u, n].find((x) => x.error)?.error;
+  const err = [p, r, s, e, sc, u, n, t, tm, et].find((x) => x.error)?.error;
   if (err) throw err;
 
   const rank = { member: 0, leader: 1, admin: 2 } as const;
@@ -82,8 +102,21 @@ async function fetchAll() {
   }
   const sectors: Sector[] = (s.data ?? []).map((x) => ({ id: x.name, name: x.name as Skill, leader_id: x.leader_id }));
 
+  const teams: Team[] = (t.data ?? []).map((x) => ({
+    id: x.id,
+    name: x.name,
+    description: x.description,
+    color: x.color,
+    leader_id: x.leader_id,
+    status: x.status as Team["status"],
+    members: (tm.data ?? []).filter((m) => m.team_id === x.id).map((m) => ({ user_id: m.user_id, sector: m.sector as Skill })),
+  }));
+  const eventTeams: Record<string, string> = {};
+  for (const row of et.data ?? []) eventTeams[row.event_id] = row.team_id;
+
   const users: User[] = (p.data ?? []).map((x) => {
-    const leads = sectors.find((sec) => sec.leader_id === x.id)?.name ?? null;
+    const lt = teams.find((tt) => tt.leader_id === x.id);
+    const leads = lt ? lt.name : null;
     let role: User["role"] = (x.user_id && roleOf.get(x.user_id)) || "member";
     if (role === "member" && leads) role = "leader";
     return {
@@ -120,6 +153,8 @@ async function fetchAll() {
     swap_reason: x.swap_reason,
     confirmation_token: x.confirmation_token,
     notified_at: x.notified_at,
+    team_id: x.team_id,
+    adjusted: x.adjusted,
   }));
 
   const notifications: NotificationItem[] = (n.data ?? []).map((x) => ({
@@ -129,7 +164,7 @@ async function fetchAll() {
     kind: x.kind as NotificationItem["kind"],
   }));
 
-  return { users, sectors, events, schedules, notifications };
+  return { users, sectors, events, schedules, notifications, teams, eventTeams };
 }
 
 export function StoreProvider({ children, enabled }: { children: ReactNode; enabled: boolean }) {
@@ -139,7 +174,7 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
   useEffect(() => {
     if (!enabled) return;
     const ch = supabase.channel("syncmidia-live");
-    for (const t of ["profiles", "user_roles", "sectors", "events", "schedules", "unavailability", "notifications"]) {
+    for (const t of ["profiles", "user_roles", "sectors", "events", "schedules", "unavailability", "notifications", "teams", "team_members", "event_teams"]) {
       ch.on("postgres_changes", { event: "*", schema: "public", table: t }, () => {
         qc.invalidateQueries({ queryKey: KEY });
       });
@@ -177,8 +212,46 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
       }
     };
 
+    const teams = data?.teams ?? [];
     return {
       loading: isLoading,
+      teams,
+      eventTeams: data?.eventTeams ?? {},
+      teamOfUser: (id) => teams.find((tt) => tt.members.some((m) => m.user_id === id)),
+      saveTeam: async (id, d) => {
+        const complete = !!d.leader_id && d.members.length === 5;
+        const row = { name: d.name.trim(), description: d.description, color: d.color, leader_id: d.leader_id, status: complete ? "active" : "inactive" };
+        let teamId = id;
+        if (id) {
+          const { error: e0 } = await supabase.from("team_members").delete().eq("team_id", id);
+          check(e0);
+          const { error } = await supabase.from("teams").update(row).eq("id", id);
+          check(error);
+        } else {
+          const { data: created, error } = await supabase.from("teams").insert(row).select("id").single();
+          check(error);
+          teamId = created!.id;
+        }
+        if (d.members.length) {
+          const { error } = await supabase.from("team_members").insert(d.members.map((m) => ({ team_id: teamId!, user_id: m.user_id, sector: m.sector })));
+          check(error);
+        }
+        await pushNotification(`Equipe ${row.name} ${id ? "atualizada" : "criada"}${complete ? "" : " (incompleta)"}.`, "system");
+        refresh();
+      },
+      deleteTeam: async (id) => {
+        const { error } = await supabase.from("teams").delete().eq("id", id);
+        check(error);
+        refresh();
+      },
+      setEventTeam: async (eventId, teamId) => {
+        const { error: e0 } = await supabase.from("event_teams").delete().eq("event_id", eventId);
+        check(e0);
+        if (teamId) {
+          const { error } = await supabase.from("event_teams").insert({ event_id: eventId, team_id: teamId });
+          check(error);
+        }
+      },
       users,
       sectors,
       events,
@@ -279,10 +352,11 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
         const { error } = await supabase.from("schedules").update({ notified_at: new Date().toISOString() }).eq("id", scheduleId);
         check(error);
       },
-      publishSchedule: async (eventId, assignments, notify = false) => {
+      publishSchedule: async (eventId, assignments, notify = false, teamId = null) => {
+        const team = teamId ? teams.find((tt) => tt.id === teamId) : undefined;
         const prev = schedules.filter((s) => s.event_id === eventId);
         const now = new Date().toISOString();
-        const rows: { event_id: string; profile_id: string; sector: Skill; role_label: string; status: string; notified_at: string | null; confirmation_token?: string }[] = [];
+        const rows: { event_id: string; profile_id: string; sector: Skill; role_label: string; status: string; notified_at: string | null; confirmation_token?: string; team_id: string | null; adjusted: boolean }[] = [];
         (Object.keys(assignments) as Skill[]).forEach((sector) => {
           assignments[sector].forEach((userId, index) => {
             const old = prev.find((s) => s.user_id === userId && s.sector_name === sector);
@@ -293,6 +367,8 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
               role_label: sector === "Câmera" ? `Câmera ${index + 1}` : sector === "Social" ? "Redes Sociais" : sector,
               status: notify ? "pending" : old?.status ?? "pending",
               notified_at: notify ? now : old?.notified_at ?? null,
+              team_id: team?.id ?? null,
+              adjusted: !!team && !team.members.some((m) => m.user_id === userId && m.sector === sector),
               ...(old?.confirmation_token ? { confirmation_token: old.confirmation_token } : {}),
             });
           });

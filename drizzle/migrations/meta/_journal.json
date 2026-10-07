@@ -15,6 +15,13 @@
       "when": 1791274949526,
       "tag": "0001_add_phone_to_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791363763244,
+      "tag": "0002_teams_model",
+      "breakpoints": true
     }
   ]
 }

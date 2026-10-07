@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      event_teams: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          event_id: string
+          id: string
+          team_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          team_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_teams_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_teams_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           category: string | null
@@ -109,6 +148,7 @@ export type Database = {
       }
       schedules: {
         Row: {
+          adjusted: boolean
           confirmation_token: string
           created_at: string
           event_id: string
@@ -119,8 +159,10 @@ export type Database = {
           sector: Database["public"]["Enums"]["skill"]
           status: string
           swap_reason: string | null
+          team_id: string | null
         }
         Insert: {
+          adjusted?: boolean
           confirmation_token?: string
           created_at?: string
           event_id: string
@@ -131,8 +173,10 @@ export type Database = {
           sector: Database["public"]["Enums"]["skill"]
           status?: string
           swap_reason?: string | null
+          team_id?: string | null
         }
         Update: {
+          adjusted?: boolean
           confirmation_token?: string
           created_at?: string
           event_id?: string
@@ -143,6 +187,7 @@ export type Database = {
           sector?: Database["public"]["Enums"]["skill"]
           status?: string
           swap_reason?: string | null
+          team_id?: string | null
         }
         Relationships: [
           {
@@ -157,6 +202,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -179,6 +231,83 @@ export type Database = {
             foreignKeyName: "sectors_leader_id_fkey"
             columns: ["leader_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          id: string
+          sector: Database["public"]["Enums"]["skill"]
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          sector: Database["public"]["Enums"]["skill"]
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          sector?: Database["public"]["Enums"]["skill"]
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          color: string
+          created_at: string
+          description: string
+          id: string
+          leader_id: string | null
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          description?: string
+          id?: string
+          leader_id?: string | null
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          description?: string
+          id?: string
+          leader_id?: string | null
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
