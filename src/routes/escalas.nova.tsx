@@ -51,7 +51,7 @@ function buildAssignments(
 }
 
 function NovaEscala() {
-  const { users, events, schedules, publishSchedule, addEvent } = useStore();
+  const { users, events, schedules, publishSchedule, addEvent, teams, eventTeams, setEventTeam } = useStore();
   const { evento } = Route.useSearch();
   const initialId = events.find((e) => e.id === evento)?.id ?? events[0]?.id ?? "";
   const [eventId, setEventId] = useState(initialId);
@@ -62,6 +62,7 @@ function NovaEscala() {
   const [eventModal, setEventModal] = useState(false);
   const [addMenu, setAddMenu] = useState<Skill | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [teamId, setTeamId] = useState<string | null>(eventTeams[initialId] ?? null);
 
   const event = events.find((e) => e.id === eventId);
   const eventDay = event ? dateKey(event.date_time) : "";
@@ -77,6 +78,7 @@ function NovaEscala() {
   function selectEvent(id: string) {
     setEventId(id);
     setAssignments(buildAssignments(id, schedules));
+    setTeamId(eventTeams[id] ?? null);
     setAddMenu(null);
   }
 
@@ -87,6 +89,7 @@ function NovaEscala() {
     const id = await addEvent({ title: "Culto de Domingo", date_time: `${key}T10:00:00`, recurring: false });
     setEventId(id);
     setAssignments(emptyAssign());
+    setTeamId(null);
     toast.success(`Culto de Domingo (${pad(d.getDate())}/${MONTHS[d.getMonth()]}) criado.`);
   }
 
@@ -101,7 +104,54 @@ function NovaEscala() {
     setAssignments((prev) => ({ ...prev, [sector]: prev[sector].filter((id) => id !== userId) }));
   }
 
+  const span = (e: { date_time: string; end_time?: string | undefined }) => {
+    const start = new Date(e.date_time).getTime();
+    let end = start + 2 * 3600e3;
+    if (e.end_time && /^\d{2}:\d{2}/.test(e.end_time)) {
+      const d = new Date(e.date_time);
+      const [h, m] = e.end_time.split(":").map(Number);
+      d.setHours(h ?? 0, m ?? 0, 0, 0);
+      if (d.getTime() > start) end = d.getTime();
+    }
+    return [start, end] as const;
+  };
+  function teamConflict(tid: string) {
+    if (!event) return null;
+    const [a1, a2] = span(event);
+    return events.find((e) => {
+      if (e.id === event.id || eventTeams[e.id] !== tid) return false;
+      const [b1, b2] = span(e);
+      return a1 < b2 && b1 < a2;
+    }) ?? null;
+  }
+  function applyTeam(tid: string, silent = false) {
+    const team = teams.find((t) => t.id === tid);
+    if (!team) return;
+    if (team.status !== "active") { toast.error("Só equipes Ativas (líder + 5 funções) podem ser atribuídas."); return; }
+    const c = teamConflict(tid);
+    if (c) { toast.error(`${team.name} já está em ${c.title} (${formatLongDate(c.date_time)} · ${formatTime(c.date_time)}).`); return; }
+    const next = emptyAssign();
+    const off: string[] = [];
+    team.members.forEach((m) => {
+      const u = users.find((x) => x.id === m.user_id);
+      if (u && (u.status !== "Ativo" || isUnavailable(u))) off.push(u.name);
+      next[m.sector].push(m.user_id);
+    });
+    setAssignments(next);
+    setTeamId(tid);
+    if (!silent) toast.success(`Equipe ${team.name} atribuída.${off.length ? ` Atenção: ${off.join(", ")} indisponível(is) — ajuste se necessário.` : ""}`);
+  }
+  const teamUses = (tid: string) => Object.values(eventTeams).filter((x) => x === tid).length;
+
   function autoFill() {
+    const candidates = teams
+      .filter((t) => t.status === "active" && !teamConflict(t.id))
+      .sort((a, b) => teamUses(a.id) - teamUses(b.id));
+    if (candidates[0]) {
+      applyTeam(candidates[0].id, true);
+      toast.success(`Rotação: equipe ${candidates[0].name} (menos escalada).`);
+      return;
+    }
     const next = emptyAssign();
     const used = new Set<string>();
     SKILLS.forEach((sector) => {
@@ -134,6 +184,12 @@ function NovaEscala() {
         return bSun - aSun || b.date_time.localeCompare(a.date_time);
       })[0];
     if (!previous) { toast.error("Nenhuma escala anterior encontrada."); return; }
+    const prevTeam = eventTeams[previous.id];
+    if (prevTeam && teams.some((t) => t.id === prevTeam && t.status === "active") && !teamConflict(prevTeam)) {
+      applyTeam(prevTeam, true);
+      toast.success(`Equipe copiada de ${previous.title} (${formatLongDate(previous.date_time)}).`);
+      return;
+    }
     const base = buildAssignments(previous.id, schedules);
     let removed = 0;
     SKILLS.forEach((s) => {
@@ -197,6 +253,45 @@ function NovaEscala() {
               </button>
             );
           })}
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Equipe:</span>
+            {teams.length === 0 ? (
+              <span className="text-xs text-muted-foreground">Nenhuma equipe criada — monte as equipes em Equipe.</span>
+            ) : null}
+            {teams.map((t) => {
+              const conflict = teamConflict(t.id);
+              const disabled = t.status !== "active" || !!conflict;
+              const active = teamId === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => applyTeam(t.id)}
+                  disabled={disabled && !active}
+                  title={t.status !== "active" ? "Equipe incompleta" : conflict ? `Ocupada em ${conflict.title}` : ""}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                    active ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color }} />
+                  {t.name}
+                  {t.status !== "active" ? " · incompleta" : conflict ? " · ocupada" : ""}
+                </button>
+              );
+            })}
+            {teamId ? (
+              <button onClick={() => { setTeamId(null); setAssignments(emptyAssign()); }} className="text-xs font-medium text-muted-foreground underline">
+                Remover equipe
+              </button>
+            ) : null}
+          </div>
+          {teamId ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Trocas ou remoções abaixo valem só para esta escala (marcadas como ajuste) — a equipe original não muda.
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
@@ -360,7 +455,8 @@ function NovaEscala() {
           count={assignedIds.size}
           onClose={() => setPublishOpen(false)}
           onConfirm={async (channels) => {
-            const n = await publishSchedule(eventId, assignments, channels.length > 0);
+            const n = await publishSchedule(eventId, assignments, channels.length > 0, teamId);
+            await setEventTeam(eventId, teamId);
             setPublishOpen(false);
             const sent = n * channels.length;
             toast.success(channels.length ? `Escala publicada e ${sent} notificações enviadas!` : "Escala publicada.");
