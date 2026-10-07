@@ -44,6 +44,8 @@ export interface Schedule {
   swap_reason?: string | null;
   confirmation_token?: string;
   notified_at?: string | null;
+  team_id?: string | null;
+  adjusted?: boolean;
 }
 
 export interface NotificationItem {
