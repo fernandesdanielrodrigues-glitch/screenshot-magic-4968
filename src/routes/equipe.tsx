@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { Avatar, LeaderBadge, MemberStatusBadge, SkillTag } from "@/components/Badges";
 import { SKILLS, type Skill } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
+import { TeamsPanel } from "@/components/TeamsPanel";
 
 export const Route = createFileRoute("/equipe")({
   head: () => ({
@@ -25,6 +26,7 @@ function EquipePage() {
   const { user: me } = useAuth();
   const isAdmin = me?.role === "admin";
   const leaderSector = me?.role === "leader" ? (me.leaderOf ?? null) : null;
+  const [tab, setTab] = useState<"equipes" | "voluntarios">("equipes");
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState<Skill | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -50,7 +52,19 @@ function EquipePage() {
   const history = schedules.filter((s) => s.user_id === historyFor);
 
   return (
-    <AppShell title="Gestão de Equipe" subtitle="Membros, competências e liderança por setor.">
+    <AppShell title="Gestão de Equipe" subtitle="Equipes pré-montadas e voluntários por função.">
+      <div className="mb-4 inline-flex rounded-lg bg-secondary p-1">
+        {(["equipes", "voluntarios"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${tab === t ? "bg-card text-foreground shadow-card" : "text-muted-foreground"}`}
+          >
+            {t === "equipes" ? "Equipes" : "Voluntários"}
+          </button>
+        ))}
+      </div>
+      {tab === "equipes" ? <TeamsPanel canEdit={isAdmin} /> : (<>
       <div className="rounded-xl bg-card p-5 shadow-card">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="relative min-w-0">
@@ -266,6 +280,7 @@ function EquipePage() {
           </ul>
         </Modal>
       ) : null}
+    </>)}
     </AppShell>
   );
 }
