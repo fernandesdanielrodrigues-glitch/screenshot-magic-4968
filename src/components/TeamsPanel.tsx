@@ -141,9 +141,9 @@ function TeamModal({ team, onClose }: { team: Team | null; onClose: () => void }
 
   async function save() {
     const n = name.trim();
-    if (!n) return toast.error("Dê um nome à equipe.");
-    if (n.length > 60) return toast.error("Nome muito longo (máx. 60).");
-    if (teams.some((t) => t.name.toLowerCase() === n.toLowerCase() && t.id !== team?.id)) return toast.error("Já existe uma equipe com esse nome.");
+    if (!n) { toast.error("Dê um nome à equipe."); return; }
+    if (n.length > 60) { toast.error("Nome muito longo (máx. 60)."); return; }
+    if (teams.some((t) => t.name.toLowerCase() === n.toLowerCase() && t.id !== team?.id)) { toast.error("Já existe uma equipe com esse nome."); return; }
     setBusy(true);
     try {
       await saveTeam(team?.id ?? null, {
