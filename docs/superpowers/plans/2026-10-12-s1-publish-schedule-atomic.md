@@ -93,6 +93,7 @@ BEGIN
            profile_id, sector, status, notified_at, confirmation_token
     FROM public.schedules
     WHERE event_id = p_event_id
+    ORDER BY profile_id, sector, created_at DESC
   ), d AS (
     DELETE FROM public.schedules WHERE event_id = p_event_id
   ), i AS (
