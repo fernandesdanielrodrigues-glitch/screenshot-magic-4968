@@ -16,6 +16,9 @@ dist-ssr
 .nitro
 *.local
 
+# Superpowers worktrees
+.worktrees/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
