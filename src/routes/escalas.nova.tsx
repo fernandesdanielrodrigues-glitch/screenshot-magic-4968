@@ -51,7 +51,7 @@ function buildAssignments(
 }
 
 function NovaEscala() {
-  const { users, events, schedules, publishSchedule, addEvent, teams, eventTeams, setEventTeam } = useStore();
+  const { users, events, schedules, publishSchedule, addEvent, teams, eventTeams } = useStore();
   const { evento } = Route.useSearch();
   const initialId = events.find((e) => e.id === evento)?.id ?? events[0]?.id ?? "";
   const [eventId, setEventId] = useState(initialId);
@@ -456,7 +456,6 @@ function NovaEscala() {
           onClose={() => setPublishOpen(false)}
           onConfirm={async (channels) => {
             const n = await publishSchedule(eventId, assignments, channels.length > 0, teamId);
-            await setEventTeam(eventId, teamId);
             setPublishOpen(false);
             const sent = n * channels.length;
             toast.success(channels.length ? `Escala publicada e ${sent} notificações enviadas!` : "Escala publicada.");
