@@ -354,34 +354,30 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
       },
       publishSchedule: async (eventId, assignments, notify = false, teamId = null) => {
         const team = teamId ? teams.find((tt) => tt.id === teamId) : undefined;
-        const prev = schedules.filter((s) => s.event_id === eventId);
-        const now = new Date().toISOString();
-        const rows: { event_id: string; profile_id: string; sector: Skill; role_label: string; status: string; notified_at: string | null; confirmation_token?: string; team_id: string | null; adjusted: boolean }[] = [];
-        (Object.keys(assignments) as Skill[]).forEach((sector) => {
-          assignments[sector].forEach((userId, index) => {
-            const old = prev.find((s) => s.user_id === userId && s.sector_name === sector);
-            rows.push({
-              event_id: eventId,
-              profile_id: userId,
-              sector,
-              role_label: sector === "Câmera" ? `Câmera ${index + 1}` : sector === "Social" ? "Redes Sociais" : sector,
-              status: notify ? "pending" : old?.status ?? "pending",
-              notified_at: notify ? now : old?.notified_at ?? null,
-              team_id: team?.id ?? null,
-              adjusted: !!team && !team.members.some((m) => m.user_id === userId && m.sector === sector),
-              ...(old?.confirmation_token ? { confirmation_token: old.confirmation_token } : {}),
-            });
-          });
+        const rows = (Object.keys(assignments) as Skill[]).flatMap((sector) =>
+          assignments[sector].map((userId, index) => ({
+            profile_id: userId,
+            sector,
+            role_label: sector === "Câmera" ? `Câmera ${index + 1}` : sector === "Social" ? "Redes Sociais" : sector,
+            adjusted: !!team && !team.members.some((m) => m.user_id === userId && m.sector === sector),
+          })),
+        );
+        // cast estreito: types.ts é regenerado pelo Lovable após aplicar a migration
+        const rpc = supabase.rpc as unknown as (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+        const { data: count, error } = await rpc("publish_schedule_atomic", {
+          p_event_id: eventId,
+          p_team_id: teamId,
+          p_notify: notify,
+          p_schedules: rows,
         });
-        const { error: e1 } = await supabase.from("schedules").delete().eq("event_id", eventId);
-        check(e1);
-        if (rows.length) {
-          const { error } = await supabase.from("schedules").insert(rows);
-          check(error);
-        }
+        check(error);
         const title = events.find((e) => e.id === eventId)?.title ?? "Evento";
-        await pushNotification(notify ? `Escala de ${title} publicada e ${rows.length} notificações enviadas.` : `Escala de ${title} salva.`, "system");
-        return rows.length;
+        await pushNotification(notify ? `Escala de ${title} publicada e ${Number(count ?? 0)} notificações enviadas.` : `Escala de ${title} salva.`, "system");
+        await refresh();
+        return Number(count ?? 0);
       },
     };
   }, [data, isLoading, qc]);

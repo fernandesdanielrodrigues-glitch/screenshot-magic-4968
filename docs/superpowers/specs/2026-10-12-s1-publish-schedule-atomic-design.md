@@ -93,6 +93,7 @@ UI (Publicar) → publishSchedule() → monta payload {profile_id, sector, role_
 |---|---|
 | `supabase/migrations/<ts>_publish_schedule_atomic.sql` | novo |
 | `src/lib/store.tsx` | corpo de `publishSchedule` |
+| `src/routes/escalas.nova.tsx` | chamada `setEventTeam` removida — a RPC é o único escritor de `event_teams` na publicação |
 
 ## Riscos
 
