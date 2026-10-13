@@ -262,7 +262,8 @@ criadas pelas migrations Drizzle. Nunca aplique por glob de timestamp:
 4. drizzle/migrations/0000_calendar_token.sql
 5. drizzle/migrations/0001_add_phone_to_profiles.sql
 6. drizzle/migrations/0002_teams_model.sql
-7. supabase/migrations/20261012120000_publish_schedule_atomic.sql  (SEMPRE por último — depende de teams/event_teams do Drizzle)
+7. supabase/migrations/20261012120000_publish_schedule_atomic.sql  (depende de teams/event_teams do Drizzle)
+8. supabase/migrations/20261013090000_fix_publish_schedule_atomic_temp_snapshot.sql (fix: snapshot em temp table — DEPOIS da 7)
 ```
 
 Execução (da raiz do repo no VPS, com a stack de pé; `ON_ERROR_STOP` aborta em erro):
