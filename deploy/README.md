@@ -138,6 +138,7 @@ Agora, **nesta ordem**:
    ```bash
    openssl rand -hex 24   # POSTGRES_PASSWORD, CRON_SECRET, DASHBOARD_PASSWORD
    openssl rand -base64 48  # SECRET_KEY_BASE
+   openssl rand -hex 8     # REALTIME_DB_ENC_KEY (exatamente 16 chars)
    openssl rand -hex 16    # VAULT_ENC_KEY (exatamente 32 chars), POOLER_TENANT_ID
    openssl rand -base64 24 # PG_META_CRYPTO_KEY
    openssl rand -hex 16    # S3_PROTOCOL_ACCESS_KEY_ID
@@ -183,6 +184,45 @@ supabase.<dominio> A     <IP-do-VPS>
 O Caddy só emite certificado com o DNS já apontando para cá — configure antes do `up`.
 
 ### 3.8 Subir a stack
+
+**Verificação pré-boot (obrigatória)** — com o `.env` preenchido, rode antes de subir:
+
+```bash
+# (a) Config válida e completa — a interpolação falha aqui (erro explícito)
+#     se faltar segredo ou o supabase/compose.ports.yml (§3.4) do override.
+docker compose config -q
+
+# (b) Auditoria de portas publicadas: fora do loopback, SÓ o proxy (80/443).
+docker compose config | grep -A4 'published:'
+```
+
+Esperado em (b): `published: "80"`, `published: "443"` (tcp e udp) sem `host_ip` —
+e as portas do gateway/pooler (`8000`, `5432`, `6543`) sempre com
+`host_ip: 127.0.0.1`. Qualquer outra porta publicada, ou uma dessas sem o
+`127.0.0.1`, é exposição indevida — revise o `supabase/compose.ports.yml` (§3.4)
+antes de continuar. Confirmação extra depois de subir: `ss -ltn` deve listar
+apenas 22/80/443 fora do `127.0.0.1`.
+
+```bash
+# (c) Cheque de interpolação dos links de e-mail (auth + mailer).
+docker compose config | grep -E 'API_EXTERNAL_URL|GOTRUE_MAILER_URLPATHS'
+```
+
+Atenção em (c): o GoTrue monta os links de e-mail como `API_EXTERNAL_URL` +
+`MAILER_URLPATHS_*`. **Se o link compuser `…/auth/v1/auth/v1/…` (prefixo dobrado
+— único ponto que não dá para provar offline), ajuste um dos lados até o link de
+confirmação final conter `/auth/v1/verify` UMA única vez:**
+
+- prefira tirar o prefixo dos `MAILER_URLPATHS_*` (ex.: `"/verify"`), mantendo
+  `API_EXTERNAL_URL=https://supabase.<dominio>/auth/v1` — dele também derivam o
+  callback do Google (§3.6) e o redirect registrado no GCP;
+- ou mude `API_EXTERNAL_URL` para a raiz do gateway
+  (`https://supabase.<dominio>`) — mas aí o callback passa a ser
+  `https://supabase.<dominio>/callback` e deve ser re-registrado no GCP e no
+  `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI` (§3.6).
+
+Valide no primeiro cadastro real (§6, item 1): o link do e-mail de confirmação
+precisa abrir e confirmar sem 404.
 
 ```bash
 docker compose up -d
@@ -436,6 +476,15 @@ Fonte completa: `.env.example` (cada chave comentada). As críticas:
 - **Cadastro não envia e-mail** — SMTP ausente/errado; `docker compose logs auth`.
 - **`502` no app logo após `up`** — gateway/Postgres ainda subindo; aguarde e
   verifique `docker compose ps`.
+- **App não carrega dados / SSR falha (caminho hairpin)** — o SSR chama
+  `https://supabase.<dominio>` de dentro do container (sai pela rede Docker e
+  volta pelo Caddy). Prova do caminho a partir do app:
+  `docker compose exec app node -e "fetch('https://supabase.<dominio>/auth/v1/health').then(r=>{console.log(r.status);process.exit(r.ok?0:1)})"`
+  — `200` prova o hairpin e o SSR. Se falhar (firewall/VPS bloqueando o retorno),
+  dois escapes: `extra_hosts` no serviço `app` do compose apontando
+  `supabase.<dominio>` ao IP público do VPS, ou desacoplar a URL server-side no
+  `environment` do `app` (`SUPABASE_URL: http://api-gw:8000` — gateway interno),
+  mantendo a `VITE_SUPABASE_URL` pública para o browser.
 - **`VITE_SUPABASE_URL` errada no build** — o app chama a URL antiga; confira o `.env`
   e rode `docker compose build app` de novo (§8).
 
