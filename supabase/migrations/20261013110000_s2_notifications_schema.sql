@@ -13,6 +13,8 @@ CREATE POLICY "insert notifications" ON public.notifications FOR INSERT TO authe
 CREATE POLICY "update own notifications" ON public.notifications FOR UPDATE TO authenticated
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
+GRANT UPDATE ON public.notifications TO authenticated;
+
 CREATE TABLE public.reminder_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   schedule_id uuid NOT NULL REFERENCES public.schedules(id) ON DELETE CASCADE,
