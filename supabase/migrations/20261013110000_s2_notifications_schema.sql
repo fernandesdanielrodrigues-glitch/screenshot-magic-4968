@@ -19,7 +19,7 @@ CREATE TABLE public.reminder_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   schedule_id uuid NOT NULL REFERENCES public.schedules(id) ON DELETE CASCADE,
   window text NOT NULL CHECK (window IN ('24h','2h')),
-  channel text NOT NULL CHECK (channel IN ('whatsapp','email')),
+  channel text NOT NULL CHECK (channel IN ('whatsapp','email','inapp')),
   status text NOT NULL CHECK (status IN ('sent','simulated','failed','skipped')),
   error text,
   created_at timestamptz NOT NULL DEFAULT now(),

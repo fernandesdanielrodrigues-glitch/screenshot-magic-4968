@@ -44,6 +44,22 @@ Deno.serve(async (req) => {
     for (const row of rows ?? []) {
       const ev = row.events as { title: string; date_time: string };
       const prof = row.profiles as { user_id: string | null; phone: string | null; email: string | null; name: string };
+      // In-app primeiro: o canal 'inapp' marca a janela ANTES de qualquer efeito (idempotência por schedule+window).
+      const { data: inappLogged, error: inappErr } = await db
+        .from("reminder_log")
+        .upsert(
+          { schedule_id: row.id, window: w.key, channel: "inapp", status: "sent" },
+          { onConflict: "schedule_id,window,channel", ignoreDuplicates: true },
+        )
+        .select("id");
+      if (inappErr || !inappLogged || inappLogged.length === 0) continue; // já processado nesta janela — idempotência
+      if (prof.user_id) {
+        await db.from("notifications").insert({
+          user_id: prof.user_id,
+          message: `Lembrete: ${row.role_label} no evento ${ev.title} (veja horário no app).`,
+          kind: "reminder",
+        });
+      }
       const channels: Array<{ channel: "whatsapp" | "email"; to: string }> = [];
       if (prof.phone) channels.push({ channel: "whatsapp", to: prof.phone });
       if (prof.email) channels.push({ channel: "email", to: prof.email });
@@ -84,15 +100,9 @@ Deno.serve(async (req) => {
           }
         }
         if (status === "sent") sent++;
-        else if (status === "failed") { failed++; await db.from("reminder_log").update({ status, error: errText }).eq("id", logged[0].id); }
+        else if (status === "failed") failed++;
         else simulated++;
-      }
-      if (prof.user_id) {
-        await db.from("notifications").insert({
-          user_id: prof.user_id,
-          message: `Lembrete: ${row.role_label} no evento ${ev.title} (veja horário no app).`,
-          kind: "reminder",
-        });
+        await db.from("reminder_log").update({ status, error: errText }).eq("id", logged[0].id);
       }
       await db.from("schedules").update({ notified_at: new Date().toISOString() }).eq("id", row.id);
       processed++;
