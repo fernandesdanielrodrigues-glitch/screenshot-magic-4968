@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useAuth } from "@/lib/auth";
 import { SKILLS, type Skill } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
-import { lovable } from "@/integrations/lovable";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -54,7 +54,10 @@ function LoginPage() {
   };
 
   const google = async () => {
-    const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    const r = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
     if (r.error) setError("Não foi possível entrar com o Google.");
   };
 

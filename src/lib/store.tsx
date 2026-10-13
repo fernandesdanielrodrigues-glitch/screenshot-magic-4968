@@ -362,7 +362,7 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
             adjusted: !!team && !team.members.some((m) => m.user_id === userId && m.sector === sector),
           })),
         );
-        // cast estreito: types.ts é regenerado pelo Lovable após aplicar a migration
+        // cast estreito: types.ts é regenerado após aplicar a migration
         const rpc = supabase.rpc as unknown as (
           fn: string,
           args: Record<string, unknown>,

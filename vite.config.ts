@@ -12,4 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Self-hosted target: SSR served by plain Node (Task 3 runs
+  // `node .output/server/index.mjs`). Overrides the package's cloudflare
+  // default; the override applies outside the Lovable build sandbox.
+  nitro: { preset: "node-server" },
 });
