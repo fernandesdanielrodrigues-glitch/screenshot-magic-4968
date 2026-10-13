@@ -6,10 +6,13 @@
 #   2. app   -> este repositório (Dockerfile na raiz, Nitro node-server).
 #   3. proxy -> Caddy (TLS automático, único serviço com 80/443 públicos).
 #
+# Fora dos grupos, o bloco `functions` abaixo NÃO cria serviço novo: é um merge
+# de env sobre o Edge Runtime da stack oficial (lembretes 24h/2h — README §3.8/§5).
+#
 # Uso: cp .env.example .env  &&  preencha  &&  docker compose up -d
 #
 # Requisitos: Docker Compose v2.24+ (usa `include` + tags !override).
-# Compose mais antigo: ver deploy/README.md §9 (alternativa multi-`-f`).
+# Compose mais antigo: ver deploy/README.md §10 (alternativa multi-`-f`).
 
 name: syncmidia
 
@@ -63,6 +66,22 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+
+  # Edge Runtime da stack (lembretes 24h/2h — S2; README §3.8/§5). No compose do
+  # tag self-hosted/v0.8.2 o serviço chama-se `functions` (container
+  # `supabase-edge-functions`, imagem supabase/edge-runtime): este bloco faz
+  # MERGE com o dele via include — não é um serviço novo. O oficial já injeta
+  # SUPABASE_URL (http://api-gw:8000) e SUPABASE_SERVICE_ROLE_KEY
+  # (${SERVICE_ROLE_KEY}), que a função send-reminders também lê; aqui entram
+  # apenas as duas variáveis que faltam:
+  functions:
+    environment:
+      # Bearer exigido pela função send-reminders — o mesmo CRON_SECRET das
+      # rotas de cron do app (valor único, sem _PREVIOUS; rotação: README §5.2).
+      CRON_SECRET: ${CRON_SECRET:?defina CRON_SECRET em .env}
+      # Webhook de entrega (WhatsApp/e-mail), server-side. Vazio = modo
+      # simulação (a tabela reminder_log registra status 'simulated').
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
 
 volumes:
   caddy_data:

@@ -29,6 +29,9 @@ projeto. Este runbook cobre provisionamento, replay do banco, operação e atual
   `node .output/server/index.mjs`); as variáveis `VITE_*` são **fixadas no build**.
 - **`proxy`** — Caddy (`deploy/Caddyfile`): `app.<dominio>` → `app:3000`;
   `supabase.<dominio>` → `api-gw:8000` apenas para rotas de API (Studio → 403).
+- **Edge Function `send-reminders`** — lembretes 24h/2h (S2): roda no Edge
+  Runtime da stack (serviço `functions`, atrás do `api-gw`), com o código
+  copiado no provisionamento (§3.8) e disparo por cron do host (§5).
 - Rede interna do Compose; as portas de host da stack Supabase ficam presas ao
   loopback (`127.0.0.1`) pelo `supabase/compose.ports.yml` (criado no §3.4).
 
@@ -45,7 +48,7 @@ Arquivos deste diretório:
 
 - VPS **2 vCPU / 4 GB+** (a stack Supabase é pesada) com acesso root.
 - Docker **Engine + plugin Compose v2.24 ou maior** (`docker compose version`).
-  Compose mais antigo? Use a alternativa do §9.
+  Compose mais antigo? Use a alternativa do §10.
 - Um domínio próprio com controle de DNS (dois registros A — §3.7).
 - Credenciais **SMTP** (host, porta, usuário, senha, remetente).
 - Um **client OAuth Google** próprio no Google Cloud Console (§3.6).
@@ -69,7 +72,7 @@ git clone <URL-DO-SEU-REPO> syncmidia && cd syncmidia/deploy
 
 A stack oficial vive em `supabase/supabase` (pasta `docker/`) e é publicada nos tags
 `self-hosted/vX.Y.Z`. Este deploy fixa **`self-hosted/v0.8.2`**. Para atualizar depois,
-siga o procedimento do §7 — ele preserva os dados vivos de `supabase/volumes/` e
+siga o procedimento do §8 — ele preserva os dados vivos de `supabase/volumes/` e
 reaplica os ajustes locais (não repita este clone sobre uma instalação existente).
 
 ```bash
@@ -120,7 +123,7 @@ Agora, **nesta ordem**:
    Os demais arquivos de `deploy/` (`docker-compose.yml`, `Caddyfile`,
    `.env.example`, `README.md`) continuam rastreados — as regras são específicas
    para os artefatos locais (`deploy/docker-compose.legacy.yml` só existe no modo
-   legacy do §9; a regra não faz mal algum se você não o usar).
+   legacy do §10; a regra não faz mal algum se você não o usar).
 
 2. **Domínios e URLs** — `APP_DOMAIN`, `SUPABASE_DOMAIN`, `VITE_SUPABASE_URL`,
    `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL` (deve terminar em `/auth/v1`),
@@ -147,10 +150,12 @@ Agora, **nesta ordem**:
 
 5. **SMTP (obrigatório)** — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`,
    `SMTP_ADMIN_EMAIL`, `SMTP_SENDER_NAME`. **Sem SMTP o cadastro e o reset de senha
-   não enviam e-mail** — valide antes do primeiro teste de cadastro (§6).
+   não enviam e-mail** — valide antes do primeiro teste de cadastro (§7).
 6. **Google OAuth** — §3.6 abaixo.
-7. `CRON_SECRET` — segredo das rotas de cron do app. Para rotacionar no futuro,
-   gere um novo, mova o antigo para `CRON_SECRET_PREVIOUS` e reinicie o `app`.
+7. `CRON_SECRET` — segredo das rotas de cron do app **e da Edge Function
+   `send-reminders`** (§3.8/§5). Para rotacionar no futuro, gere um novo, mova o
+   antigo para `CRON_SECRET_PREVIOUS` e siga o §5.2 (o app aceita os dois
+   valores; a Edge Function e o crontab usam só o atual).
 
 ### 3.6 Google OAuth
 
@@ -183,7 +188,41 @@ supabase.<dominio> A     <IP-do-VPS>
 
 O Caddy só emite certificado com o DNS já apontando para cá — configure antes do `up`.
 
-### 3.8 Subir a stack
+### 3.8 Copiar a Edge Function `send-reminders` (lembretes)
+
+O código da função é versionado no repo (`supabase/functions/send-reminders/`),
+mas a stack oficial espera as functions **dentro do clone**: o serviço
+`functions` (Edge Runtime, container `supabase-edge-functions`) monta
+`./volumes/functions` → `/home/deno/functions` e serve cada subpasta em
+`/functions/v1/<nome>`. Copie a função para o clone — ao lado do `main/`
+que o clone já traz:
+
+```bash
+# de deploy/ (§3.3 já clonou a stack)
+mkdir -p supabase/volumes/functions
+cp -r ../supabase/functions/send-reminders supabase/volumes/functions/
+rm -rf supabase/volumes/functions/hello   # opcional: amostra pública da stack
+```
+
+Env que a função usa (tudo já sai do `.env` — nada de segredo novo):
+
+- `CRON_SECRET` — a função só aceita `POST` com
+  `Authorization: Bearer $CRON_SECRET` (o mesmo das rotas de cron do app; o
+  `deploy/docker-compose.yml` o injeta no serviço `functions`, pois o compose
+  oficial não o passa).
+- `NOTIFY_WEBHOOK_URL` — webhook de WhatsApp/e-mail; **vazio = modo simulação**
+  (disparos registrados em `reminder_log` com status `simulated`).
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — **não configure**: o compose
+  oficial já os passa ao serviço (`http://api-gw:8000` e `${SERVICE_ROLE_KEY}`).
+
+`FUNCTIONS_VERIFY_JWT` **mantenha `false`** (como no `.env.example`). Com
+`true`, o Edge Runtime exigiria um JWT do Supabase no header **antes** de
+executar a função — e o Bearer do cron (`$CRON_SECRET`) não é um JWT. A função
+faz a própria auth e responde 401 sozinha quando o segredo não bate.
+
+O cron que dispara a função e a premissa de fuso (horários em UTC) ficam no §5.
+
+### 3.9 Subir a stack
 
 **Verificação pré-boot (obrigatória)** — com o `.env` preenchido, rode antes de subir:
 
@@ -221,7 +260,7 @@ confirmação final conter `/auth/v1/verify` UMA única vez:**
   `https://supabase.<dominio>/callback` e deve ser re-registrado no GCP e no
   `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI` (§3.6).
 
-Valide no primeiro cadastro real (§6, item 1): o link do e-mail de confirmação
+Valide no primeiro cadastro real (§7, item 1): o link do e-mail de confirmação
 precisa abrir e confirmar sem 404.
 
 ```bash
@@ -238,9 +277,9 @@ curl -fsSI https://app.<dominio>                      # HTTP 200/30x
 ```
 
 Se `https://supabase.<dominio>/` responder **403, está certo** — o Studio nunca é
-público (§3.9). O app pode mostrar erro de dados até o replay do banco (§4) — aceitável.
+público (§3.10). O app pode mostrar erro de dados até o replay do banco (§4) — aceitável.
 
-### 3.9 Túnel SSH para o Studio (e psql, se quiser)
+### 3.10 Túnel SSH para o Studio (e psql, se quiser)
 
 ```bash
 ssh -L 8000:localhost:8000 usuario@<IP-do-VPS>
@@ -297,7 +336,7 @@ SQL
 
 ### 4.1 Regenerar os types do Supabase
 
-Da sua máquina (com o túnel do §3.9 ativo) ou do VPS, com a CLI do Supabase instalada:
+Da sua máquina (com o túnel do §3.10 ativo) ou do VPS, com a CLI do Supabase instalada:
 
 ```bash
 supabase gen types typescript \
@@ -308,7 +347,99 @@ supabase gen types typescript \
 Confirme que `publish_schedule_atomic` aparece em `Functions` no arquivo gerado.
 Commit separado se o `types.ts` (ou o cast local em `store.tsx`) mudar.
 
-## 5. Backups — pg_dump via cron no host
+## 5. Lembretes (24h/2h) — cron horário no host
+
+A Edge Function `send-reminders` (copiada no §3.8) cuida dos lembretes de escala:
+para cada escala pendente/confirmada cujo evento cai dentro das janelas de 24h e
+de 2 horas, grava a notificação in-app e dispara o webhook de WhatsApp/e-mail.
+Ela é **idempotente** por `(escala, janela, canal)` — tabela `reminder_log` —
+então dispará-la toda hora não duplica nada: cada janela sai na primeira
+execução que a encontra. A rota `https://supabase.<dominio>/functions/v1/*` já
+passa pelo Caddy (está na lista de API do `Caddyfile`).
+
+O Supabase self-hosted não tem scheduler próprio: o gatilho é um **cron do
+host** — a cada hora, um `curl` autenticado com `CRON_SECRET` chama a função.
+
+### 5.1 Premissa de fuso: horários de evento são armazenados em UTC
+
+`events.date_time` é `timestamp` **sem** timezone — o banco guarda o valor
+exatamente como escrito e não sabe a que fuso ele se refere. A função calcula
+as janelas com `new Date().toISOString()` (referência **UTC**) e compara o
+resultado diretamente com o valor gravado. A premissa deste deploy é fixa:
+
+> **`events.date_time` é gravado em UTC.**
+
+Hoje o app grava a string do input `datetime-local` **sem conversão** — hora
+local de quem cadastra o evento. Se os eventos ficarem gravados em hora local,
+as janelas deslocam pelo fuso: no horário de Brasília (UTC−3) o lembrete "de 24
+horas" sai 3h mais cedo (27h antes do evento) e o "de 2 horas" também (5h
+antes). Para a premissa valer de verdade:
+
+1. **Operação em UTC** — host e containers com timezone UTC (o default do
+   Docker já é UTC; confira o banco:
+   `docker exec supabase-db psql -U postgres -d postgres -c 'show timezone'`).
+2. **Escrita em UTC** — o valor persistido tem que ser UTC na origem (o app
+   converter a hora local antes de gravar). Até a escrita ser normalizada no
+   app, o desvio descrito acima é conhecido e esperado — não é falha do cron
+   nem do deploy.
+3. A outra saída seria gravar hora local e calcular as janelas na mesma
+   referência — como o código da função fixa UTC, quem tem que se alinhar é a
+   gravação; não existe ajuste de fuso no deploy.
+
+### 5.2 Crontab
+
+```bash
+sudo tee /etc/cron.d/syncmidia-reminders >/dev/null <<'EOF'
+# Lembretes 24h/2h — Edge Function send-reminders (deploy/README.md §5)
+0 * * * * root . /opt/syncmidia/deploy/.env && curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://supabase.<dominio>/functions/v1/send-reminders >> /var/log/syncmidia-reminders.log 2>&1
+EOF
+```
+
+Ajuste `/opt/syncmidia` ao caminho real do clone (§3.2) e `<dominio>` ao seu
+DNS. Arquivos em `/etc/cron.d` são relidos sozinhos — nada para recarregar.
+
+Teste manual (a mesma chamada do cron, direto no terminal — a resposta vem no
+stdout):
+
+```bash
+. ./deploy/.env && curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" \
+  https://supabase.<dominio>/functions/v1/send-reminders
+# {"processed":N,"sent":N,"simulated":N,"failed":N}
+```
+
+Diagnóstico rápido: **401** = `CRON_SECRET` divergente entre o `.env` que o
+compose interpola (serviço `functions`) e o header enviado — ou
+`FUNCTIONS_VERIFY_JWT` ligado (§3.8); **erro 500** do runtime = função não
+copiada para o clone (§3.8).
+
+**Rotação do `CRON_SECRET`** — a Edge Function usa um valor único (não conhece
+o `CRON_SECRET_PREVIOUS`, esse é só do app). Troque os pontos em sequência, na
+mesma janela: gere o novo segredo, atualize o `.env` (antigo →
+`CRON_SECRET_PREVIOUS`), rode `docker compose up -d app functions` e ajuste a
+linha do `/etc/cron.d`. Entre um passo e outro o log pode registrar alguns 401
+— inofensivo: a idempotência recupera o disparo na execução seguinte.
+
+### 5.3 Inspecionar os lembretes
+
+```bash
+tail -n 50 /var/log/syncmidia-reminders.log   # 1 linha por hora: o JSON da resposta
+docker compose logs --tail 50 functions       # lado do Edge Runtime (erros de execução)
+```
+
+O que de fato aconteceu fica no banco (tabela `reminder_log` — uma linha por
+escala + janela + canal):
+
+```bash
+docker exec supabase-db psql -U postgres -d postgres -c \
+  "select window, channel, status, count(*) from reminder_log group by 1,2,3 order by 1 desc;"
+```
+
+`status`: `sent` (webhook respondeu 2xx), `failed` (ver a coluna `error` — ex.
+HTTP do webhook), `simulated` (sem `NOTIFY_WEBHOOK_URL`), `skipped`
+(voluntário sem telefone/e-mail). As notificações in-app ficam na tabela
+`notifications` (`kind = 'reminder'`).
+
+## 6. Backups — pg_dump via cron no host
 
 ```bash
 sudo mkdir -p /var/backups/syncmidia
@@ -324,7 +455,7 @@ Restaure com `gunzip -c db-YYYY-MM-DD.sql.gz | docker exec -i supabase-db psql -
 Arquivos do Storage (avatares) vivem no volume `deploy/supabase/volumes/storage` —
 inclua o diretório no snapshot do provedor do VPS.
 
-## 6. Validação pós-replay (checklist)
+## 7. Validação pós-replay (checklist)
 
 1. **SMTP primeiro** — cadastre um usuário e confirme que o e-mail de confirmação checa
    com URL em `https://app.<dominio>` (o `SITE_URL` errado quebra os links).
@@ -332,8 +463,11 @@ inclua o diretório no snapshot do provedor do VPS.
 3. Reset de senha por e-mail.
 4. Realtime: duas abas, mutação em uma reflete na outra.
 5. Feed público: `/confirmar/<token>` e `/api/public/agenda/<token>.ics` respondem.
+6. **Lembretes** — rode o teste manual do §5.2 (resposta 200 com o JSON de
+   contadores); com um evento dentro da janela de 24h, confirme o disparo no
+   `reminder_log` (§5.3) e a notificação in-app.
 
-## 7. Atualizar a stack Supabase
+## 8. Atualizar a stack Supabase
 
 Atenção: `deploy/supabase/` **não** é um repositório git (o §3.3 copia apenas a pasta
 `docker/` do clone), e `supabase/volumes/` guarda os dados vivos (Postgres, Storage).
@@ -358,23 +492,30 @@ git clone --depth 1 --branch self-hosted/vX.Y.Z \
 mv /tmp/supabase-src/docker ./supabase
 rm -rf /tmp/supabase-src
 
-# 3. Restaure dados vivos e o override de portas (§3.4)
+# 3. Restaure dados vivos e o override de portas (§3.4). O clone novo já vem
+#    com `volumes/` de exemplo — REMOVA-O antes do `mv`, senão o keep seria
+#    aninhado DENTRO dele (supabase/volumes/supabase-volumes.keep) e a stack
+#    subiria com o banco vazio.
+rm -rf supabase/volumes
 mv ./supabase-volumes.keep supabase/volumes
 mv ./compose.ports.yml.keep supabase/compose.ports.yml
 
 # 4. Reaplique os ajustes locais no compose NOVO: leia o CHANGELOG.md do novo
 #    tag e descomente de novo as 4 linhas GOTRUE_EXTERNAL_GOOGLE_* (§3.6),
 #    comparando com ./docker-compose.antes.keep.
-#    (Modo legacy §9: reaplique também o sed de portas do passo 1 daquele fluxo.)
+#    Recopie a Edge Function (§3.8) — o passo 3 restaurou os volumes ANTIGOS;
+#    a recopia garante a versão atual do repo no Edge Runtime:
+#      mkdir -p supabase/volumes/functions && cp -r ../supabase/functions/send-reminders supabase/volumes/functions/
+#    (Modo legacy §10: reaplique também o sed de portas do passo 1 daquele fluxo.)
 
 # 5. Suba e verifique
 docker compose pull && docker compose up -d
 ```
 
-Depois de tudo saudável (verificações do §3.8), remova o resquício:
+Depois de tudo saudável (verificações do §3.9), remova o resquício:
 `rm ./docker-compose.antes.keep`.
 
-## 8. Atualizar o app
+## 9. Atualizar o app
 
 ```bash
 git pull && docker compose build app && docker compose up -d app
@@ -383,7 +524,16 @@ git pull && docker compose build app && docker compose up -d app
 As `VITE_*` são fixadas em build-args a partir do `.env` — se `VITE_SUPABASE_URL` ou
 `VITE_SUPABASE_PUBLISHABLE_KEY` mudarem, o rebuild acima já as incorpora.
 
-## 9. Alternativa para Compose < 2.24 (multi-`-f`)
+Se o `git pull` tiver alterado `supabase/functions/send-reminders` (ou você
+recopiar a função por outro motivo), sincronize o Edge Runtime também (§3.8):
+
+```bash
+rm -rf supabase/volumes/functions/send-reminders
+cp -r ../supabase/functions/send-reminders supabase/volumes/functions/
+docker compose restart functions
+```
+
+## 10. Alternativa para Compose < 2.24 (multi-`-f`)
 
 O `docker-compose.yml` usa `include` (Compose ≥ 2.20) + tags `!override` (≥ 2.24).
 Em versões mais antigas:
@@ -423,6 +573,14 @@ Em versões mais antigas:
          CRON_SECRET: ${CRON_SECRET:?defina CRON_SECRET em .env}
          CRON_SECRET_PREVIOUS: ${CRON_SECRET_PREVIOUS:-}
 
+     # Edge Runtime (lembretes 24h/2h — §3.8/§5): mesmo merge de env do
+     # docker-compose.yml principal, aqui no modo multi-`-f` (sem ele, a
+     # função subiria sem CRON_SECRET e rejeitaria tudo com 401).
+     functions:
+       environment:
+         CRON_SECRET: ${CRON_SECRET:?defina CRON_SECRET em .env}
+         NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
+
      proxy:
        image: caddy:2
        restart: unless-stopped
@@ -452,7 +610,7 @@ Em versões mais antigas:
    docker compose --env-file .env -f supabase/docker-compose.yml -f docker-compose.legacy.yml build app
    ```
 
-## 10. Referência rápida de variáveis
+## 11. Referência rápida de variáveis
 
 Fonte completa: `.env.example` (cada chave comentada). As críticas:
 
@@ -464,16 +622,18 @@ Fonte completa: `.env.example` (cada chave comentada). As críticas:
 | `SUPABASE_PUBLIC_URL` | URL pública da API (sem caminho) |
 | `API_EXTERNAL_URL` | base do Auth; **deve terminar em `/auth/v1`** |
 | `SITE_URL` | origem do app; links dos e-mails apontam para cá |
-| `SERVICE_ROLE_KEY` | usada server-side pelo app (feed ICS, admin) |
-| `CRON_SECRET` (+ `_PREVIOUS`) | auth das rotas de cron do app |
+| `SERVICE_ROLE_KEY` | usada server-side pelo app (feed ICS, admin) e pela stack (Edge Runtime) |
+| `CRON_SECRET` (+ `_PREVIOUS`) | auth das rotas de cron do app e da Edge Function `send-reminders` (§5) |
+| `NOTIFY_WEBHOOK_URL` | webhook dos lembretes (server-side); vazio = simulação (§5) |
+| `FUNCTIONS_VERIFY_JWT` | Edge Runtime — **mantenha `false`** (§3.8) |
 | `POSTGRES_PORT` | **não altere** (portas internas dependem); presa ao loopback |
 | `DASHBOARD_USERNAME/PASSWORD` | basic auth do Studio via túnel |
 
-## 11. Problemas comuns
+## 12. Problemas comuns
 
 - **Certificado não emite** — DNS ainda não propagado ou portas 80/443 bloqueadas;
   veja `docker compose logs proxy`.
-- **`403` em `supabase.<dominio>/`** — comportamento esperado (Studio só via túnel §3.9).
+- **`403` em `supabase.<dominio>/`** — comportamento esperado (Studio só via túnel §3.10).
 - **Cadastro não envia e-mail** — SMTP ausente/errado; `docker compose logs auth`.
 - **`502` no app logo após `up`** — gateway/Postgres ainda subindo; aguarde e
   verifique `docker compose ps`.
@@ -487,12 +647,19 @@ Fonte completa: `.env.example` (cada chave comentada). As críticas:
   `environment` do `app` (`SUPABASE_URL: http://api-gw:8000` — gateway interno),
   mantendo a `VITE_SUPABASE_URL` pública para o browser.
 - **`VITE_SUPABASE_URL` errada no build** — o app chama a URL antiga; confira o `.env`
-  e rode `docker compose build app` de novo (§8).
+  e rode `docker compose build app` de novo (§9).
+- **Lembretes não saem (cron falha)** — veja `/var/log/syncmidia-reminders.log`:
+  `401` = `CRON_SECRET` divergente entre o `.env` (serviço `functions`) e o header
+  do crontab, ou `FUNCTIONS_VERIFY_JWT` ligado; erro 500 do runtime = função não
+  copiada (§3.8). Sem linha nova no log = cron não rodando (§5.2) — confira o
+  caminho do `.env` na linha do `/etc/cron.d` e `docker compose logs functions`.
+- **Lembrete chega adiantado/atrasado** — fuso: a função compara
+  `events.date_time` com UTC; a premissa é gravar horários em UTC (§5.1).
 
-## 12. Higiene do repositório
+## 13. Higiene do repositório
 
 Arquivos **locais** (nunca versionados): `deploy/.env`, `deploy/supabase/` e
-`deploy/docker-compose.legacy.yml` (§9). As regras de `.gitignore` que os protegem
-são adicionadas no **passo obrigatório do §3.5** — ao atualizar a stack (§7) ou
+`deploy/docker-compose.legacy.yml` (§10). As regras de `.gitignore` que os protegem
+são adicionadas no **passo obrigatório do §3.5** — ao atualizar a stack (§8) ou
 restaurar o VPS do zero, confira com `git status` que nenhum deles aparece como
 não-rastreado antes de qualquer `git add`.
