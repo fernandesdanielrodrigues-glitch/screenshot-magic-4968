@@ -1,0 +1,43 @@
+# SyncMídia — Caddy: TLS automático (Let's Encrypt) e proxy reverso.
+#
+# Os domínios chegam como variáveis de ambiente do serviço `proxy`
+# (deploy/docker-compose.yml, a partir de deploy/.env):
+#   APP_DOMAIN=app.exemplo.com
+#   SUPABASE_DOMAIN=supabase.exemplo.com
+#
+# Requisito para emissão do certificado: os dois registros DNS apontando
+# para o VPS e portas 80/443 alcançáveis (deploy/README.md §3.7).
+
+https://{$APP_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# UI + SSR + /api/public/agenda/<token>.ics
+	reverse_proxy app:3000
+}
+
+https://{$SUPABASE_DOMAIN} {
+	# Mesma lista de rotas de API do proxy oficial do Supabase
+	# (supabase/supabase@self-hosted/v0.8.2, docker/volumes/proxy/caddy/Caddyfile).
+	@supabase_api path /auth/v1/* /rest/v1/* /graphql/v1 /realtime/v1/* /storage/v1/* /functions/v1/* /mcp /sso/* /.well-known/oauth-authorization-server
+
+	handle @supabase_api {
+		# api-gw é o gateway da stack (Envoy; alias de rede mantém `kong`).
+		reverse_proxy api-gw:8000
+	}
+
+	# Tudo o que não é API (inclui o Studio) NUNCA é público —
+	# o Studio se acessa apenas via túnel SSH (deploy/README.md §3.9).
+	handle {
+		respond 403
+	}
+
+	header -Server
+}

@@ -1,0 +1,69 @@
+# SyncMídia — composição do VPS self-hosted.
+#
+# Três grupos:
+#   1. Stack oficial do Supabase  -> incluída abaixo (clone de supabase/supabase
+#      no tag `self-hosted/v0.8.2`, em ./supabase/ — ver deploy/README.md §3).
+#   2. app   -> este repositório (Dockerfile na raiz, Nitro node-server).
+#   3. proxy -> Caddy (TLS automático, único serviço com 80/443 públicos).
+#
+# Uso: cp .env.example .env  &&  preencha  &&  docker compose up -d
+#
+# Requisitos: Docker Compose v2.24+ (usa `include` + tags !override).
+# Compose mais antigo: ver deploy/README.md §9 (alternativa multi-`-f`).
+
+name: syncmidia
+
+include:
+  - path:
+      # Stack oficial self-hosted do Supabase (git clone em release fixada).
+      - ./supabase/docker-compose.yml
+      # criado no provisionamento (deploy/README.md §3): prende as portas de
+      # host da stack ao loopback — nada do Supabase fica público além do que
+      # o Caddy encaminha.
+      - ./supabase/compose.ports.yml
+
+services:
+  app:
+    build:
+      # Contexto = raiz do repo (este arquivo vive em deploy/).
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        # Fixados no build — o app nunca lê URL do Supabase em runtime.
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?defina VITE_SUPABASE_URL em .env}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:?defina VITE_SUPABASE_PUBLISHABLE_KEY em .env}
+        # Opcional: webhook de notificações (sem ele, envios são simulados).
+        VITE_NOTIFY_WEBHOOK_URL: ${VITE_NOTIFY_WEBHOOK_URL:-}
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      # Mesma origem pública do cliente (build) — zero divergência de sessão.
+      SUPABASE_URL: ${VITE_SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+      # Chave de serviço — apenas server-side (client.server.ts / feed ICS).
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?defina SERVICE_ROLE_KEY em .env}
+      # Auth das rotas de cron (rotação: defina CRON_SECRET_PREVIOUS ao trocar).
+      CRON_SECRET: ${CRON_SECRET:?defina CRON_SECRET em .env}
+      CRON_SECRET_PREVIOUS: ${CRON_SECRET_PREVIOUS:-}
+
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?defina APP_DOMAIN em .env}
+      SUPABASE_DOMAIN: ${SUPABASE_DOMAIN:?defina SUPABASE_DOMAIN em .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

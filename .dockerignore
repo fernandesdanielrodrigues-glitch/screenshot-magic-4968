@@ -1,0 +1,22 @@
+# Contexto de build enxuto — o build usa apenas o código do app.
+# Nada disto entra na imagem.
+
+# Dependências e artefatos de build (instalados/gerados dentro da imagem)
+node_modules
+.output
+.tanstack
+
+# Git e diretórios de trabalho locais
+.git
+.worktrees
+.superpowers
+
+# Segredos — VITE_* entra SOMENTE via build-args (Vite não deve ler .env do host)
+.env
+.env.*
+
+# Infra e docs — não participam do build do app
+deploy
+docs
+supabase
+drizzle
