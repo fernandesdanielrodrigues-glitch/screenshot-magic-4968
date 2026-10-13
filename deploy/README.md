@@ -69,7 +69,8 @@ git clone <URL-DO-SEU-REPO> syncmidia && cd syncmidia/deploy
 
 A stack oficial vive em `supabase/supabase` (pasta `docker/`) e é publicada nos tags
 `self-hosted/vX.Y.Z`. Este deploy fixa **`self-hosted/v0.8.2`**. Para atualizar depois,
-escolha um tag novo, leia o `CHANGELOG.md` da pasta e repita o clone (§7).
+siga o procedimento do §7 — ele preserva os dados vivos de `supabase/volumes/` e
+reaplica os ajustes locais (não repita este clone sobre uma instalação existente).
 
 ```bash
 git clone --depth 1 --branch self-hosted/v0.8.2 \
@@ -104,12 +105,27 @@ EOF
 cp .env.example .env
 ```
 
-Edite o `.env` e preencha, **nesta ordem**:
+Agora, **nesta ordem**:
 
-1. **Domínios e URLs** — `APP_DOMAIN`, `SUPABASE_DOMAIN`, `VITE_SUPABASE_URL`,
+1. **Proteja os segredos no git (obrigatório, antes de preencher)** — o `.env` guarda
+   `JWT_SECRET`, `SERVICE_ROLE_KEY`, `SMTP_PASS` e `DASHBOARD_PASSWORD`; sem esta
+   regra ele está a um `git add .` de subir para o repositório. Os comandos abaixo
+   rodam de `deploy/` (o `.gitignore` do repo é `../.gitignore`):
+
+   ```bash
+   printf 'deploy/.env\ndeploy/supabase/\ndeploy/docker-compose.legacy.yml\n' >> ../.gitignore
+   git -C .. check-ignore -v deploy/.env deploy/supabase/   # deve listar as regras recém-adicionadas
+   ```
+
+   Os demais arquivos de `deploy/` (`docker-compose.yml`, `Caddyfile`,
+   `.env.example`, `README.md`) continuam rastreados — as regras são específicas
+   para os artefatos locais (`deploy/docker-compose.legacy.yml` só existe no modo
+   legacy do §9; a regra não faz mal algum se você não o usar).
+
+2. **Domínios e URLs** — `APP_DOMAIN`, `SUPABASE_DOMAIN`, `VITE_SUPABASE_URL`,
    `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL` (deve terminar em `/auth/v1`),
    `SITE_URL` — substitua `<dominio>` pelo seu domínio.
-2. **Chaves da stack** — gere de dentro de `deploy/` (o utilitário edita o `./.env`
+3. **Chaves da stack** — gere de dentro de `deploy/` (o utilitário edita o `./.env`
    local, que é exatamente o arquivo que o compose interpola):
 
    ```bash
@@ -117,7 +133,7 @@ Edite o `.env` e preencha, **nesta ordem**:
    ```
 
    Preencha então `VITE_SUPABASE_PUBLISHABLE_KEY` com **o mesmo valor de `ANON_KEY`**.
-3. **Outros segredos** (`openssl rand -hex N`, hex evita caracteres que quebram URLs):
+4. **Outros segredos** (`openssl rand -hex N`, hex evita caracteres que quebram URLs):
 
    ```bash
    openssl rand -hex 24   # POSTGRES_PASSWORD, CRON_SECRET, DASHBOARD_PASSWORD
@@ -128,11 +144,11 @@ Edite o `.env` e preencha, **nesta ordem**:
    openssl rand -hex 32    # S3_PROTOCOL_ACCESS_KEY_SECRET
    ```
 
-4. **SMTP (obrigatório)** — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`,
+5. **SMTP (obrigatório)** — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`,
    `SMTP_ADMIN_EMAIL`, `SMTP_SENDER_NAME`. **Sem SMTP o cadastro e o reset de senha
    não enviam e-mail** — valide antes do primeiro teste de cadastro (§6).
-5. **Google OAuth** — §3.6 abaixo.
-6. `CRON_SECRET` — segredo das rotas de cron do app. Para rotacionar no futuro,
+6. **Google OAuth** — §3.6 abaixo.
+7. `CRON_SECRET` — segredo das rotas de cron do app. Para rotacionar no futuro,
    gere um novo, mova o antigo para `CRON_SECRET_PREVIOUS` e reinicie o `app`.
 
 ### 3.6 Google OAuth
@@ -230,7 +246,7 @@ done
 Verificação (todas devem retornar `t` / `5`):
 
 ```bash
-docker exec supabase-db psql -U postgres -d postgres <<'SQL'
+docker exec -i supabase-db psql -U postgres -d postgres <<'SQL'
 select to_regclass('public.teams') is not null and to_regclass('public.event_teams') is not null;          -- t
 select to_regproc('public.publish_schedule_atomic') is not null;                                           -- t
 select to_regproc('public.handle_new_user') is not null and to_regproc('public.respond_invite') is not null; -- t
@@ -278,13 +294,44 @@ inclua o diretório no snapshot do provedor do VPS.
 
 ## 7. Atualizar a stack Supabase
 
+Atenção: `deploy/supabase/` **não** é um repositório git (o §3.3 copia apenas a pasta
+`docker/` do clone), e `supabase/volumes/` guarda os dados vivos (Postgres, Storage).
+Nunca repita o §3.3 sobre uma instalação existente — o `mv` aninharia `docker/` dentro
+de `supabase/` e o `rm -rf` apagaria os dados. Procedimento correto (janela de
+manutenção: o `down` derruba app e proxy junto; os volumes nomeados do Caddy e os
+bind mounts sobrevivem — só `down -v` os remove):
+
 ```bash
 cd deploy
-git -C supabase fetch --tags --depth 1 origin tag self-hosted/vX.Y.Z
-git -C supabase checkout self-hosted/vX.Y.Z
-# leia docker/CHANGELOG.md do novo tag e aplique ajustes de config indicados
+docker compose down                     # para tudo; dados preservados em disco
+
+# 1. Preserve os dados vivos e os ajustes locais fora do diretório da stack
+mv supabase/volumes ./supabase-volumes.keep
+mv supabase/compose.ports.yml ./compose.ports.yml.keep
+cp supabase/docker-compose.yml ./docker-compose.antes.keep   # suas edições do §3.6
+
+# 2. Re-clone no novo tag (mesma mecânica do §3.3) e troque o código da stack
+rm -rf supabase
+git clone --depth 1 --branch self-hosted/vX.Y.Z \
+  https://github.com/supabase/supabase.git /tmp/supabase-src
+mv /tmp/supabase-src/docker ./supabase
+rm -rf /tmp/supabase-src
+
+# 3. Restaure dados vivos e o override de portas (§3.4)
+mv ./supabase-volumes.keep supabase/volumes
+mv ./compose.ports.yml.keep supabase/compose.ports.yml
+
+# 4. Reaplique os ajustes locais no compose NOVO: leia o CHANGELOG.md do novo
+#    tag e descomente de novo as 4 linhas GOTRUE_EXTERNAL_GOOGLE_* (§3.6),
+#    comparando com ./docker-compose.antes.keep.
+#    (Modo legacy §9: reaplique também o sed de portas do passo 1 daquele fluxo.)
+
+# 5. Suba e verifique
 docker compose pull && docker compose up -d
 ```
+
+Depois de tudo saudável (verificações do §3.8), remova o resquício:
+`rm ./docker-compose.antes.keep`.
 
 ## 8. Atualizar o app
 
@@ -394,6 +441,8 @@ Fonte completa: `.env.example` (cada chave comentada). As críticas:
 
 ## 12. Higiene do repositório
 
-Arquivos **locais** (nunca versionar): `deploy/.env`, `deploy/supabase/`,
-`deploy/docker-compose.legacy.yml` (§9). Recomenda-se adicioná-los ao `.gitignore`
-do repo no primeiro provisionamento.
+Arquivos **locais** (nunca versionados): `deploy/.env`, `deploy/supabase/` e
+`deploy/docker-compose.legacy.yml` (§9). As regras de `.gitignore` que os protegem
+são adicionadas no **passo obrigatório do §3.5** — ao atualizar a stack (§7) ou
+restaurar o VPS do zero, confira com `git status` que nenhum deles aparece como
+não-rastreado antes de qualquer `git add`.
