@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { sendScheduleNotification } from "@/lib/notifications";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, StatusBadge } from "@/components/Badges";
-import { SKILLS, formatLongDate, formatTime } from "@/lib/mock-data";
+import { SKILLS, formatLongDate, formatTime, type ReminderLog } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
@@ -46,7 +46,9 @@ function MetricCard({
 }
 
 function Dashboard() {
-  const { events, schedules, notifications, userById, markNotified } = useStore();
+  const { events, schedules, notifications, reminderLog, userById, markNotified } = useStore();
+
+  const feed = notifications.filter((n) => !n.user_id);
 
   const total = schedules.length;
   const confirmed = schedules.filter((s) => s.status === "confirmed").length;
@@ -61,10 +63,18 @@ function Dashboard() {
     const now = Date.now();
     const next = [...events].filter((e) => new Date(e.date_time).getTime() > now).sort((a, b) => a.date_time.localeCompare(b.date_time))[0];
     const list = next ? schedules.filter((s) => s.event_id === next.id) : [];
-    const start = next ? new Date(next.date_time).getTime() : 0;
-    const reminder = (h: number) => {
-      const at = start - h * 3600000;
-      return now >= at ? { label: "Enviado", cls: "bg-success/15 text-success" } : { label: `Agendado · ${new Date(at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`, cls: "bg-secondary text-secondary-foreground" };
+    const statusView: Record<ReminderLog["status"] | "scheduled", { label: string; cls: string }> = {
+      sent: { label: "Enviado", cls: "bg-success/15 text-success" },
+      simulated: { label: "Simulado", cls: "bg-primary/10 text-primary" },
+      failed: { label: "Falhou", cls: "bg-destructive/12 text-destructive" },
+      skipped: { label: "Pulado", cls: "bg-secondary text-secondary-foreground" },
+      scheduled: { label: "Agendado", cls: "bg-secondary text-secondary-foreground" },
+    };
+    const reminderStatus = (scheduleId: string, win: ReminderLog["window"]) => {
+      const latest = reminderLog
+        .filter((r) => r.schedule_id === scheduleId && r.window === win)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+      return latest ? latest.status : "scheduled";
     };
     async function resend(id: string) {
       const r = await Promise.all([sendScheduleNotification(id, "whatsapp"), sendScheduleNotification(id, "email")]);
@@ -77,9 +87,6 @@ function Dashboard() {
         {!next ? <p className="mt-3 text-sm text-muted-foreground">Nenhum evento futuro.</p> : (
           <>
             <p className="mt-1 truncate text-sm text-muted-foreground">{next.title} · {formatLongDate(next.date_time)} {formatTime(next.date_time)}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-              {[24, 2].map((h) => { const r = reminder(h); return <span key={h} className={`rounded-full px-2.5 py-1 ${r.cls}`}>Lembrete {h}h: {r.label}</span>; })}
-            </div>
             <ul className="mt-4 space-y-2">
               {list.map((s) => (
                 <li key={s.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
@@ -87,6 +94,16 @@ function Dashboard() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">{userById(s.user_id)?.name}</p>
                     <p className="truncate text-xs text-muted-foreground">{s.notified_at ? `Notificado ${new Date(s.notified_at).toLocaleDateString("pt-BR")}` : "Não notificado"} · {s.role_label}</p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {(["24h", "2h"] as const).map((win) => {
+                        const v = statusView[reminderStatus(s.id, win)];
+                        return (
+                          <span key={win} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${v.cls}`}>
+                            Lembrete {win}: {v.label}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                   {s.status === "pending" ? (
                     <button onClick={() => void resend(s.id)} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-semibold text-primary transition hover:bg-primary/10">
@@ -172,7 +189,7 @@ function Dashboard() {
         <section className="rounded-xl bg-card p-5 shadow-card">
           <h2 className="text-lg font-semibold text-foreground">Notificações recentes</h2>
           <ul className="mt-4 space-y-4">
-            {notifications.map((n) => (
+            {feed.map((n) => (
               <li key={n.id} className="flex gap-3">
                 <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
                 <div className="min-w-0">

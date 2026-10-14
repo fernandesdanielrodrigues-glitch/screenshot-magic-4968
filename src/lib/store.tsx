@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type {
   AppEvent,
   NotificationItem,
+  ReminderLog,
   Schedule,
   ScheduleStatus,
   Sector,
@@ -45,6 +46,7 @@ interface StoreValue {
   events: AppEvent[];
   schedules: Schedule[];
   notifications: NotificationItem[];
+  reminderLog: ReminderLog[];
   userById: (id: string) => User | undefined;
   nameLeaderOfSector: (userId: string, sector: Skill) => Promise<void>;
   removeLeader: (userId: string) => Promise<void>;
@@ -53,6 +55,7 @@ interface StoreValue {
   setScheduleStatus: (scheduleId: string, status: ScheduleStatus, reason?: string) => Promise<void>;
   publishSchedule: (eventId: string, assignments: Record<Skill, string[]>, notify?: boolean, teamId?: string | null) => Promise<number>;
   markNotified: (scheduleId: string) => Promise<void>;
+  markAllNotificationsRead: (authId: string) => Promise<void>;
   pushNotification: (message: string, kind: NotificationItem["kind"]) => Promise<void>;
   addEvent: (data: {
     title: string;
@@ -78,20 +81,47 @@ function relTime(iso: string) {
   return `há ${Math.round(diff / 1440)} dias`;
 }
 
+// casts estreitos: `notifications.user_id/read_at` e a tabela `reminder_log` ainda não
+// estão em types.ts — ele é regenerado após aplicar as migrations S2 (mesmo motivo do
+// cast de rpc em publishSchedule abaixo).
+type NotificationRow = {
+  id: string;
+  message: string;
+  kind: string;
+  created_at: string;
+  user_id?: string | null;
+  read_at?: string | null;
+};
+type ReminderLogRow = {
+  id: string;
+  schedule_id: string;
+  window: string;
+  channel: string;
+  status: string;
+  error: string | null;
+  created_at: string;
+};
+
 async function fetchAll() {
-  const [p, r, s, e, sc, u, n, t, tm, et] = await Promise.all([
+  const fromLog = supabase.from as unknown as (
+    table: string,
+  ) => {
+    select: (columns: string) => PromiseLike<{ data: ReminderLogRow[] | null; error: { message: string } | null }>;
+  };
+  const [p, r, s, e, sc, u, n, t, tm, et, rl] = await Promise.all([
     supabase.from("profiles").select("*").order("name"),
     supabase.from("user_roles").select("user_id, role"),
     supabase.from("sectors").select("*"),
     supabase.from("events").select("*").order("date_time"),
     supabase.from("schedules").select("*").order("created_at"),
     supabase.from("unavailability").select("*"),
-    supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(20),
+    supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(50),
     supabase.from("teams").select("*").order("name"),
     supabase.from("team_members").select("*"),
     supabase.from("event_teams").select("*"),
+    fromLog("reminder_log").select("*"),
   ]);
-  const err = [p, r, s, e, sc, u, n, t, tm, et].find((x) => x.error)?.error;
+  const err = [p, r, s, e, sc, u, n, t, tm, et, rl].find((x) => x.error)?.error;
   if (err) throw err;
 
   const rank = { member: 0, leader: 1, admin: 2 } as const;
@@ -157,14 +187,26 @@ async function fetchAll() {
     adjusted: x.adjusted,
   }));
 
-  const notifications: NotificationItem[] = (n.data ?? []).map((x) => ({
+  const notifications: NotificationItem[] = ((n.data ?? []) as NotificationRow[]).map((x) => ({
     id: x.id,
     message: x.message,
     time: relTime(x.created_at),
     kind: x.kind as NotificationItem["kind"],
+    user_id: x.user_id ?? null,
+    read_at: x.read_at ?? null,
   }));
 
-  return { users, sectors, events, schedules, notifications, teams, eventTeams };
+  const reminderLog: ReminderLog[] = (rl.data ?? []).map((x) => ({
+    id: x.id,
+    schedule_id: x.schedule_id,
+    window: x.window as ReminderLog["window"],
+    channel: x.channel as ReminderLog["channel"],
+    status: x.status as ReminderLog["status"],
+    error: x.error ?? null,
+    created_at: x.created_at,
+  }));
+
+  return { users, sectors, events, schedules, notifications, reminderLog, teams, eventTeams };
 }
 
 export function StoreProvider({ children, enabled }: { children: ReactNode; enabled: boolean }) {
@@ -174,7 +216,7 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
   useEffect(() => {
     if (!enabled) return;
     const ch = supabase.channel("syncmidia-live");
-    for (const t of ["profiles", "user_roles", "sectors", "events", "schedules", "unavailability", "notifications", "teams", "team_members", "event_teams"]) {
+    for (const t of ["profiles", "user_roles", "sectors", "events", "schedules", "unavailability", "notifications", "reminder_log", "teams", "team_members", "event_teams"]) {
       ch.on("postgres_changes", { event: "*", schema: "public", table: t }, () => {
         qc.invalidateQueries({ queryKey: KEY });
       });
@@ -257,6 +299,7 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
       events,
       schedules,
       notifications: data?.notifications ?? [],
+      reminderLog: data?.reminderLog ?? [],
       userById: (id) => users.find((u) => u.id === id),
       pushNotification,
       addEvent: async ({ title, date_time, recurring, description, category, end_time }) => {
@@ -352,6 +395,24 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
         const { error } = await supabase.from("schedules").update({ notified_at: new Date().toISOString() }).eq("id", scheduleId);
         check(error);
       },
+      markAllNotificationsRead: async (authId) => {
+        // cast estreito: ver nota em fetchAll (types.ts desatualizado até regeneração)
+        const from = supabase.from as unknown as (
+          table: string,
+        ) => {
+          update: (values: { read_at: string }) => {
+            eq: (column: string, value: string) => {
+              is: (column: string, value: null) => PromiseLike<{ error: { message: string } | null }>;
+            };
+          };
+        };
+        const { error } = await from("notifications")
+          .update({ read_at: new Date().toISOString() })
+          .eq("user_id", authId)
+          .is("read_at", null);
+        check(error);
+        refresh();
+      },
       publishSchedule: async (eventId, assignments, notify = false, teamId = null) => {
         const team = teamId ? teams.find((tt) => tt.id === teamId) : undefined;
         const rows = (Object.keys(assignments) as Skill[]).flatMap((sector) =>
@@ -375,7 +436,7 @@ export function StoreProvider({ children, enabled }: { children: ReactNode; enab
         });
         check(error);
         const title = events.find((e) => e.id === eventId)?.title ?? "Evento";
-        await pushNotification(notify ? `Escala de ${title} publicada e ${Number(count ?? 0)} notificações enviadas.` : `Escala de ${title} salva.`, "system");
+        await pushNotification(notify ? `Escala de ${title} publicada.` : `Escala de ${title} salva.`, "system");
         await refresh();
         return Number(count ?? 0);
       },

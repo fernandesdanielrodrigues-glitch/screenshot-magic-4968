@@ -1,8 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Bell, CalendarDays, LayoutDashboard, ListChecks, LogOut, Menu, Smartphone, User as UserIcon, Users, FlaskConical } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { canAccess, initials, roleLabel, useAuth, type Role } from "@/lib/auth";
+import type { NotificationItem } from "@/lib/mock-data";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +23,15 @@ const navItems = [
   { to: "/minha-agenda", label: "Minha Agenda", icon: Smartphone },
 ] as const;
 
+const kindLabels: Record<NotificationItem["kind"], { label: string; cls: string }> = {
+  assignment: { label: "Escala", cls: "bg-primary/10 text-primary" },
+  reminder: { label: "Lembrete", cls: "bg-warning/20 text-warning-foreground" },
+  confirm: { label: "Confirmação", cls: "bg-success/15 text-success" },
+  swap: { label: "Substituição", cls: "bg-ocean/12 text-ocean" },
+  leader: { label: "Liderança", cls: "bg-accent/15 text-accent-foreground" },
+  system: { label: "Sistema", cls: "bg-secondary text-secondary-foreground" },
+};
+
 export function AppShell({
   title,
   subtitle,
@@ -30,10 +41,11 @@ export function AppShell({
   subtitle?: string;
   children: ReactNode;
 }) {
-  const { notifications } = useStore();
+  const { notifications, markAllNotificationsRead } = useStore();
   const { user, signOut, testAs } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
@@ -41,6 +53,9 @@ export function AppShell({
   });
 
   if (!user) return null;
+
+  const personal = notifications.filter((n) => n.user_id === user.authId);
+  const unread = personal.filter((n) => !n.read_at).length;
 
   return (
     <div className="min-h-screen bg-background font-sans">
@@ -78,15 +93,61 @@ export function AppShell({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              aria-label="Notificações"
-              className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 transition hover:bg-white/20"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="absolute -right-0.5 -top-0.5 grid h-5 w-5 place-items-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
-                {notifications.length}
-              </span>
-            </button>
+            <div className="relative">
+              <button
+                aria-label="Notificações"
+                aria-expanded={bellOpen}
+                onClick={() => setBellOpen((v) => !v)}
+                className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 transition hover:bg-white/20"
+              >
+                <Bell className="h-4 w-4" />
+                {unread > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground">
+                    {unread}
+                  </span>
+                ) : null}
+              </button>
+              {bellOpen ? (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setBellOpen(false)} aria-hidden="true" />
+                  <div className="absolute right-0 top-12 z-30 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-popover shadow-card">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border px-4 py-3">
+                      <p className="text-sm font-semibold text-foreground">Notificações</p>
+                      <button
+                        onClick={() => {
+                          void markAllNotificationsRead(user.authId).then(() =>
+                            toast.success("Notificações marcadas como lidas."),
+                          );
+                        }}
+                        disabled={unread === 0}
+                        className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Marcar todas como lidas
+                      </button>
+                    </div>
+                    <ul className="max-h-80 overflow-y-auto">
+                      {personal.map((n) => (
+                        <li key={n.id} className={cn("border-b border-border/60 px-4 py-3 last:border-b-0", !n.read_at && "bg-accent/5")}>
+                          <div className="flex items-start gap-2">
+                            <span className={cn("mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold", kindLabels[n.kind].cls)}>
+                              {kindLabels[n.kind].label}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className={cn("text-sm text-foreground", !n.read_at && "font-semibold")}>{n.message}</p>
+                              <p className="text-xs text-muted-foreground">{n.time}{n.read_at ? "" : " · não lida"}</p>
+                            </div>
+                            {!n.read_at ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" /> : null}
+                          </div>
+                        </li>
+                      ))}
+                      {personal.length === 0 ? (
+                        <li className="px-4 py-6 text-center text-sm text-muted-foreground">Nenhuma notificação pessoal.</li>
+                      ) : null}
+                    </ul>
+                  </div>
+                </>
+              ) : null}
+            </div>
             <span className="hidden rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold sm:inline">
               {roleLabel(user)}
             </span>

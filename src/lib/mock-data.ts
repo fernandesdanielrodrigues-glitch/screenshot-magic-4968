@@ -52,7 +52,19 @@ export interface NotificationItem {
   id: string;
   message: string;
   time: string;
-  kind: "confirm" | "swap" | "leader" | "system";
+  kind: "confirm" | "swap" | "leader" | "system" | "assignment" | "reminder";
+  user_id?: string | null;
+  read_at?: string | null;
+}
+
+export interface ReminderLog {
+  id: string;
+  schedule_id: string;
+  window: "24h" | "2h";
+  channel: "whatsapp" | "email" | "inapp";
+  status: "sent" | "simulated" | "failed" | "skipped";
+  error?: string | null;
+  created_at: string;
 }
 
 export const SKILLS: Skill[] = ["Slide", "Telão", "Câmera", "Social", "Foto"];

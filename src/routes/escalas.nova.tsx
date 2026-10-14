@@ -457,8 +457,7 @@ function NovaEscala() {
           onConfirm={async (channels) => {
             const n = await publishSchedule(eventId, assignments, channels.length > 0, teamId);
             setPublishOpen(false);
-            const sent = n * channels.length;
-            toast.success(channels.length ? `Escala publicada e ${sent} notificações enviadas!` : "Escala publicada.");
+            toast.success(`Escala de ${event.title} publicada (${n} escalado(s)).`);
           }}
         />
       ) : null}

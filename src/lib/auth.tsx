@@ -6,6 +6,7 @@ import type { Skill } from "./mock-data";
 export type Role = "admin" | "leader" | "member";
 
 export interface AuthUser {
+  authId: string;
   profileId: string | null;
   phone: string | null;
   avatarUrl: string | null;
@@ -75,6 +76,7 @@ async function loadUser(uid: string, email: string): Promise<AuthUser> {
   const realRole: Role = rs.includes("admin") ? "admin" : rs.includes("leader") || leaderOf ? "leader" : "member";
   const test = typeof localStorage !== "undefined" ? (localStorage.getItem(TEST_KEY) as Role | null) : null;
   return {
+    authId: uid,
     profileId: prof?.id ?? null,
     phone: prof?.phone ?? null,
     avatarUrl: prof?.avatar_url ?? null,
