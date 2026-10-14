@@ -1,4 +1,4 @@
--- S2: notificações pessoais (destinatário + lida) e log idempotente de lembretes
+﻿-- S2: notificações pessoais (destinatário + lida) e log idempotente de lembretes
 
 ALTER TABLE public.notifications
   ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -18,12 +18,12 @@ GRANT UPDATE ON public.notifications TO authenticated;
 CREATE TABLE public.reminder_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   schedule_id uuid NOT NULL REFERENCES public.schedules(id) ON DELETE CASCADE,
-  window text NOT NULL CHECK (window IN ('24h','2h')),
+  "window" text NOT NULL CHECK ("window" IN ('24h','2h')),
   channel text NOT NULL CHECK (channel IN ('whatsapp','email','inapp')),
   status text NOT NULL CHECK (status IN ('sent','simulated','failed','skipped')),
   error text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (schedule_id, window, channel)
+  UNIQUE (schedule_id, "window", channel)
 );
 ALTER TABLE public.reminder_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "read reminder_log" ON public.reminder_log FOR SELECT TO authenticated USING (true);
