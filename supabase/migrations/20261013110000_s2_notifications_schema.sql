@@ -29,3 +29,5 @@ ALTER TABLE public.reminder_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "read reminder_log" ON public.reminder_log FOR SELECT TO authenticated USING (true);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.reminder_log TO service_role;
 GRANT SELECT ON public.reminder_log TO authenticated;
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.reminder_log;
