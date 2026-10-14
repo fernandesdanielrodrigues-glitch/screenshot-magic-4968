@@ -34,7 +34,7 @@ https://{$SUPABASE_DOMAIN} {
 	}
 
 	# Tudo o que não é API (inclui o Studio) NUNCA é público —
-	# o Studio se acessa apenas via túnel SSH (deploy/README.md §3.9).
+	# o Studio se acessa apenas via túnel SSH (deploy/README.md §3.10).
 	handle {
 		respond 403
 	}

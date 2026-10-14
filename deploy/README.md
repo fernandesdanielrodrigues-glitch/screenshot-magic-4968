@@ -76,11 +76,21 @@ siga o procedimento do §8 — ele preserva os dados vivos de `supabase/volumes/
 reaplica os ajustes locais (não repita este clone sobre uma instalação existente).
 
 ```bash
-git clone --depth 1 --branch self-hosted/v0.8.2 \
-  https://github.com/supabase/supabase.git /tmp/supabase-src
-mv /tmp/supabase-src/docker ./supabase
-rm -rf /tmp/supabase-src
+git -c core.longpaths=true clone --depth 1 --quiet \
+  --branch self-hosted/v0.8.2 https://github.com/supabase/supabase supabase-src
+cd supabase-src
+[ "$(git status --porcelain | wc -l)" = "0" ] || { echo "checkout incompleto"; exit 1; }
+cd ..
+mv supabase-src/docker ./supabase
+rm -rf supabase-src
+printf 'ref=self-hosted/v0.8.2\n' > supabase/.supabase-version
 ```
+
+> Se algum mount apontar para um diretório em vez de arquivo, o checkout ficou
+> incompleto — refaça o clone (o `core.longpaths` e o cheque acima evitam esse
+> cenário: com o checkout parcial, o Docker cria diretórios vazios nos pontos de
+> mount, o `api-gw` morre com "mount a directory onto a file" e o `authenticator`
+> fica sem senha).
 
 ### 3.4 Criar `supabase/compose.ports.yml` (portas ao loopback)
 
@@ -303,6 +313,8 @@ criadas pelas migrations Drizzle. Nunca aplique por glob de timestamp:
 6. drizzle/migrations/0002_teams_model.sql
 7. supabase/migrations/20261012120000_publish_schedule_atomic.sql  (depende de teams/event_teams do Drizzle)
 8. supabase/migrations/20261013090000_fix_publish_schedule_atomic_temp_snapshot.sql (fix: snapshot em temp table — DEPOIS da 7)
+9. supabase/migrations/20261013110000_s2_notifications_schema.sql   (notificações pessoais + reminder_log)
+10. supabase/migrations/20261013110100_s2_publish_personal_notifications.sql   (RPC v3: pessoais no publish)
 ```
 
 Execução (da raiz do repo no VPS, com a stack de pé; `ON_ERROR_STOP` aborta em erro):
@@ -317,8 +329,11 @@ docker cp drizzle/migrations/0000_calendar_token.sql        supabase-db:/tmp/004
 docker cp drizzle/migrations/0001_add_phone_to_profiles.sql supabase-db:/tmp/005.sql
 docker cp drizzle/migrations/0002_teams_model.sql           supabase-db:/tmp/006.sql
 docker cp supabase/migrations/20261012120000_publish_schedule_atomic.sql supabase-db:/tmp/007.sql
+docker cp supabase/migrations/20261013090000_fix_publish_schedule_atomic_temp_snapshot.sql supabase-db:/tmp/008.sql
+docker cp supabase/migrations/20261013110000_s2_notifications_schema.sql supabase-db:/tmp/009.sql
+docker cp supabase/migrations/20261013110100_s2_publish_personal_notifications.sql supabase-db:/tmp/010.sql
 
-for f in 001 002 003 004 005 006 007; do
+for f in 001 002 003 004 005 006 007 008 009 010; do
   docker exec supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f /tmp/$f.sql || break
 done
 ```
@@ -485,12 +500,15 @@ mv supabase/volumes ./supabase-volumes.keep
 mv supabase/compose.ports.yml ./compose.ports.yml.keep
 cp supabase/docker-compose.yml ./docker-compose.antes.keep   # suas edições do §3.6
 
-# 2. Re-clone no novo tag (mesma mecânica do §3.3) e troque o código da stack
+# 2. Re-clone no novo tag (mesma mecânica do §3.3: clone completo com longpaths
+#    + cheque de checkout) e troque o código da stack
 rm -rf supabase
-git clone --depth 1 --branch self-hosted/vX.Y.Z \
-  https://github.com/supabase/supabase.git /tmp/supabase-src
-mv /tmp/supabase-src/docker ./supabase
-rm -rf /tmp/supabase-src
+git -c core.longpaths=true clone --depth 1 --quiet \
+  --branch self-hosted/vX.Y.Z https://github.com/supabase/supabase supabase-src
+[ "$(git -C supabase-src status --porcelain | wc -l)" = "0" ] || { echo "checkout incompleto"; exit 1; }
+mv supabase-src/docker ./supabase
+rm -rf supabase-src
+printf 'ref=self-hosted/vX.Y.Z\n' > supabase/.supabase-version
 
 # 3. Restaure dados vivos e o override de portas (§3.4). O clone novo já vem
 #    com `volumes/` de exemplo — REMOVA-O antes do `mv`, senão o keep seria
