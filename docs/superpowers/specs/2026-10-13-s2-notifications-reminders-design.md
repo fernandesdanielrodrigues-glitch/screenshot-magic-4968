@@ -95,3 +95,7 @@ Crontab do usuário root/deploy, horária: `0 * * * * curl -fsS -X POST -H "Auth
 ## Fora de escopo
 
 - Provedores reais (só env vars quando chegarem), aprovação de troca (fluxo + notificação de resultado), digest/semanal, push web
+
+## Adendo (14/10/2026 — decisão do parceiro)
+
+A premissa UTC e o dedupe de republish foram RECLASSIFICADOS de pós-merge para escopo da S2, por decisão do parceiro (janelas estritas + fuso = integridade temporal estrutural). Implementado: parse wall-time America/Sao_Paulo na Edge Function (APP_TIMEZONE, two-pass Intl), dedupe de 'assignment' não lida no RPC v3, validação local com eventos +23h BRT (entregue) e +25h BRT (não entregue).

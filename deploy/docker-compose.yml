@@ -73,7 +73,7 @@ services:
   # MERGE com o dele via include — não é um serviço novo. O oficial já injeta
   # SUPABASE_URL (http://api-gw:8000) e SUPABASE_SERVICE_ROLE_KEY
   # (${SERVICE_ROLE_KEY}), que a função send-reminders também lê; aqui entram
-  # apenas as duas variáveis que faltam:
+  # apenas as variáveis que faltam:
   functions:
     environment:
       # Bearer exigido pela função send-reminders — o mesmo CRON_SECRET das
@@ -82,6 +82,9 @@ services:
       # Webhook de entrega (WhatsApp/e-mail), server-side. Vazio = modo
       # simulação (a tabela reminder_log registra status 'simulated').
       NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
+      # Fuso em que events.date_time está gravado (horário de parede) — usado
+      # pela função para as janelas 24h/2h e as mensagens (README §5.1).
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
 
 volumes:
   caddy_data:

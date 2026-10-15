@@ -222,6 +222,9 @@ Env que a função usa (tudo já sai do `.env` — nada de segredo novo):
   oficial não o passa).
 - `NOTIFY_WEBHOOK_URL` — webhook de WhatsApp/e-mail; **vazio = modo simulação**
   (disparos registrados em `reminder_log` com status `simulated`).
+- `APP_TIMEZONE` — fuso em que `events.date_time` está gravado (horário de
+  parede; default `America/Sao_Paulo`); usado para as janelas 24h/2h e as
+  mensagens (§5.1).
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — **não configure**: o compose
   oficial já os passa ao serviço (`http://api-gw:8000` e `${SERVICE_ROLE_KEY}`).
 
@@ -230,7 +233,8 @@ Env que a função usa (tudo já sai do `.env` — nada de segredo novo):
 executar a função — e o Bearer do cron (`$CRON_SECRET`) não é um JWT. A função
 faz a própria auth e responde 401 sozinha quando o segredo não bate.
 
-O cron que dispara a função e a premissa de fuso (horários em UTC) ficam no §5.
+O cron que dispara a função e a premissa de fuso (horário de parede de
+`APP_TIMEZONE`) ficam no §5.
 
 ### 3.9 Subir a stack
 
@@ -375,31 +379,27 @@ passa pelo Caddy (está na lista de API do `Caddyfile`).
 O Supabase self-hosted não tem scheduler próprio: o gatilho é um **cron do
 host** — a cada hora, um `curl` autenticado com `CRON_SECRET` chama a função.
 
-### 5.1 Premissa de fuso: horários de evento são armazenados em UTC
+### 5.1 Premissa de fuso: horários de evento são horário de parede de America/Sao_Paulo
 
 `events.date_time` é `timestamp` **sem** timezone — o banco guarda o valor
-exatamente como escrito e não sabe a que fuso ele se refere. A função calcula
-as janelas com `new Date().toISOString()` (referência **UTC**) e compara o
-resultado diretamente com o valor gravado. A premissa deste deploy é fixa:
+exatamente como escrito e não sabe a que fuso ele se refere. O app grava a
+string do input `datetime-local` **sem conversão** e todas as telas exibem
+esses mesmos dígitos como hora local. A premissa deste deploy é fixa:
 
-> **`events.date_time` é gravado em UTC.**
+> **`events.date_time` armazena horário de parede de America/Sao_Paulo.**
 
-Hoje o app grava a string do input `datetime-local` **sem conversão** — hora
-local de quem cadastra o evento. Se os eventos ficarem gravados em hora local,
-as janelas deslocam pelo fuso: no horário de Brasília (UTC−3) o lembrete "de 24
-horas" sai 3h mais cedo (27h antes do evento) e o "de 2 horas" também (5h
-antes). Para a premissa valer de verdade:
+A Edge Function `send-reminders` converte esse horário de parede para
+**instantes UTC** usando `APP_TIMEZONE` (conversão em duas passadas via
+`Intl` — imune a DST, sem dependências externas) e calcula as janelas 24h/2h
+sobre o instante real do evento. Com isso os lembretes disparam nos instantes
+corretos do fuso do app, mesmo com os containers em UTC — não há
+deslocamento a compensar. A validação local provou a janela estrita: evento
+a **+23h BRT → entregue**; a **+25h BRT → não entregue**.
 
-1. **Operação em UTC** — host e containers com timezone UTC (o default do
-   Docker já é UTC; confira o banco:
-   `docker exec supabase-db psql -U postgres -d postgres -c 'show timezone'`).
-2. **Escrita em UTC** — o valor persistido tem que ser UTC na origem (o app
-   converter a hora local antes de gravar). Até a escrita ser normalizada no
-   app, o desvio descrito acima é conhecido e esperado — não é falha do cron
-   nem do deploy.
-3. A outra saída seria gravar hora local e calcular as janelas na mesma
-   referência — como o código da função fixa UTC, quem tem que se alinhar é a
-   gravação; não existe ajuste de fuso no deploy.
+- `APP_TIMEZONE` (default `America/Sao_Paulo`) é injetado no serviço
+  `functions` pelo `deploy/docker-compose.yml` e documentado no `.env.example`.
+- A conversão vive na função (two-pass `Intl`), não no SQL: a query busca um
+  intervalo largo de eventos e o filtro fino da janela acontece em JS.
 
 ### 5.2 Crontab
 
@@ -481,6 +481,11 @@ inclua o diretório no snapshot do provedor do VPS.
 6. **Lembretes** — rode o teste manual do §5.2 (resposta 200 com o JSON de
    contadores); com um evento dentro da janela de 24h, confirme o disparo no
    `reminder_log` (§5.3) e a notificação in-app.
+7. **Janela estrita de lembrete (fuso)** — crie um evento a **~23h** no fuso do
+   app (`APP_TIMEZONE`) com uma escala publicada, rode o teste manual do §5.2 e
+   confirme a entrega (`reminder_log` + notificação in-app); crie outro evento
+   a **~25h** e confirme que **não** há entrega — a janela de 24h só abre
+   dentro das 24h reais (§5.1).
 
 ## 8. Atualizar a stack Supabase
 
@@ -643,6 +648,7 @@ Fonte completa: `.env.example` (cada chave comentada). As críticas:
 | `SERVICE_ROLE_KEY` | usada server-side pelo app (feed ICS, admin) e pela stack (Edge Runtime) |
 | `CRON_SECRET` (+ `_PREVIOUS`) | auth das rotas de cron do app e da Edge Function `send-reminders` (§5) |
 | `NOTIFY_WEBHOOK_URL` | webhook dos lembretes (server-side); vazio = simulação (§5) |
+| `APP_TIMEZONE` | fuso em que `events.date_time` está gravado; janelas/mensagens da Edge Function (§5.1) |
 | `FUNCTIONS_VERIFY_JWT` | Edge Runtime — **mantenha `false`** (§3.8) |
 | `POSTGRES_PORT` | **não altere** (portas internas dependem); presa ao loopback |
 | `DASHBOARD_USERNAME/PASSWORD` | basic auth do Studio via túnel |
@@ -671,8 +677,10 @@ Fonte completa: `.env.example` (cada chave comentada). As críticas:
   do crontab, ou `FUNCTIONS_VERIFY_JWT` ligado; erro 500 do runtime = função não
   copiada (§3.8). Sem linha nova no log = cron não rodando (§5.2) — confira o
   caminho do `.env` na linha do `/etc/cron.d` e `docker compose logs functions`.
-- **Lembrete chega adiantado/atrasado** — fuso: a função compara
-  `events.date_time` com UTC; a premissa é gravar horários em UTC (§5.1).
+- **Lembrete chega adiantado/atrasado** — fuso: a função interpreta
+  `events.date_time` como horário de parede de `APP_TIMEZONE` (§5.1); confira o
+  valor no `.env` e no serviço `functions`
+  (`docker compose config | grep APP_TIMEZONE`).
 
 ## 13. Higiene do repositório
 

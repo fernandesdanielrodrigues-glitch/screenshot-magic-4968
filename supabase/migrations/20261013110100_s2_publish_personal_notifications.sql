@@ -3,6 +3,7 @@
 -- validações), acrescentando — após o INSERT das escalas e antes do RETURN —
 -- INSERT em notifications (kind 'assignment') para perfis vinculados a auth.users.
 -- Assinatura/retorno inalterados; tudo na mesma transação da função.
+-- Dedupe no INSERT: 'assignment' não lida e idêntica não é re-inserida em republish.
 
 CREATE OR REPLACE FUNCTION public.publish_schedule_atomic(
   p_event_id uuid,
@@ -78,7 +79,10 @@ BEGIN
   )
   SELECT count(*) INTO v_count FROM i;
 
-  -- Notificações pessoais (apenas perfis vinculados a auth.users)
+  -- Notificações pessoais (apenas perfis vinculados a auth.users). Dedupe: um
+  -- republish de conteúdo idêntico NÃO re-insere 'assignment' não lida igual
+  -- (a mensagem é a chave de dedupe); depois de lida, nova escalação volta a
+  -- avisar (by design).
   INSERT INTO public.notifications (user_id, message, kind)
   SELECT
     p.user_id,
@@ -88,7 +92,15 @@ BEGIN
   FROM jsonb_array_elements(p_schedules) x
   JOIN public.profiles p ON p.id = (x->>'profile_id')::uuid
   JOIN public.events e ON e.id = p_event_id
-  WHERE p.user_id IS NOT NULL;
+  WHERE p.user_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM public.notifications n
+    WHERE n.user_id = p.user_id
+      AND n.kind = 'assignment'
+      AND n.read_at IS NULL
+      AND n.message = 'Você foi escalado para ' || coalesce(nullif(trim(x->>'role_label'), ''), x->>'sector')
+        || ' no evento ' || e.title || ' em ' || to_char(e.date_time, 'DD/MM/YYYY HH24:MI') || '.'
+  );
 
   RETURN v_count;
 END;
