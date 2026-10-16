@@ -183,6 +183,7 @@ function PerfilPage() {
               {user.avatarUrl ? (
                 <button
                   type="button"
+                  disabled={savingAvatar}
                   onClick={() => void removeAvatar()}
                   className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
                 >

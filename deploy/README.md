@@ -356,6 +356,7 @@ select to_regclass('public.teams') is not null and to_regclass('public.event_tea
 select to_regproc('public.publish_schedule_atomic') is not null;                                           -- t
 select to_regproc('public.handle_new_user') is not null and to_regproc('public.respond_invite') is not null; -- t
 select count(*) from public.sectors;                                                                       -- 5 (seed)
+select public from storage.buckets where id = 'avatars';                                                   -- t
 SQL
 ```
 
