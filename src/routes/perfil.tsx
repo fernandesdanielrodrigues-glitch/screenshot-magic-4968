@@ -23,7 +23,7 @@ export const Route = createFileRoute("/perfil")({
 
 const PHONE_RE = /^\+?[\d\s()-]{8,20}$/;
 
-function resizeImage(file: File, size = 256): Promise<string> {
+function resizeImage(file: File, size = 256): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -35,11 +35,23 @@ function resizeImage(file: File, size = 256): Promise<string> {
       const m = Math.min(img.width, img.height);
       ctx.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, size, size);
       URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL("image/jpeg", 0.82));
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob"))), "image/jpeg", 0.82);
     };
     img.onerror = () => reject(new Error("Imagem inválida"));
     img.src = URL.createObjectURL(file);
   });
+}
+
+const AVATAR_URL_MARKER = "/storage/v1/object/public/avatars/";
+
+// Best-effort: apaga o objeto antigo do bucket avatars; falha não bloqueia e não avisa.
+function removeOldAvatar(url: string | null) {
+  if (!url) return;
+  const i = url.indexOf(AVATAR_URL_MARKER);
+  if (i === -1) return;
+  const path = url.slice(i + AVATAR_URL_MARKER.length);
+  if (!path) return;
+  void supabase.storage.from("avatars").remove([path]).catch(() => undefined);
 }
 
 const inputCls =
@@ -61,14 +73,30 @@ function PerfilPage() {
 
   if (!user) return null;
 
-  const saveAvatar = async (url: string | null) => {
+  const saveAvatar = async (blob: Blob) => {
     if (!user.profileId) { toast.error("Seu perfil ainda não está vinculado."); return; }
     setSavingAvatar(true);
-    const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.profileId);
+    const path = `${user.authId}/${Date.now()}.jpg`;
+    const { error: upError } = await supabase.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg" });
+    if (upError) { setSavingAvatar(false); toast.error("Não foi possível salvar a foto: " + upError.message); return; }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const { error } = await supabase.from("profiles").update({ avatar_url: data.publicUrl }).eq("id", user.profileId);
     setSavingAvatar(false);
     if (error) { toast.error("Não foi possível salvar a foto: " + error.message); return; }
+    removeOldAvatar(user.avatarUrl);
     await refresh();
-    toast.success(url ? "Foto atualizada!" : "Foto removida.");
+    toast.success("Foto atualizada!");
+  };
+
+  const removeAvatar = async () => {
+    if (!user.profileId) { toast.error("Seu perfil ainda não está vinculado."); return; }
+    setSavingAvatar(true);
+    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", user.profileId);
+    setSavingAvatar(false);
+    if (error) { toast.error("Não foi possível remover a foto: " + error.message); return; }
+    removeOldAvatar(user.avatarUrl);
+    await refresh();
+    toast.success("Foto removida.");
   };
 
   const onFile = async (f: File | undefined) => {
@@ -155,7 +183,7 @@ function PerfilPage() {
               {user.avatarUrl ? (
                 <button
                   type="button"
-                  onClick={() => void saveAvatar(null)}
+                  onClick={() => void removeAvatar()}
                   className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
                 >
                   <Trash2 className="h-3 w-3" /> Remover foto

@@ -32,6 +32,10 @@ projeto. Este runbook cobre provisionamento, replay do banco, operação e atual
 - **Edge Function `send-reminders`** — lembretes 24h/2h (S2): roda no Edge
   Runtime da stack (serviço `functions`, atrás do `api-gw`), com o código
   copiado no provisionamento (§3.8) e disparo por cron do host (§5).
+- **Avatares (Storage)** — fotos de perfil ficam no bucket público `avatars`
+  (migration `20261016100000_s3_avatar_storage.sql`, §4): o avatar é servido de
+  `https://supabase.<dominio>/storage/v1/object/public/avatars/{auth_id}/{ts}.jpg`
+  — storage-api da stack, sem passar pelo PostgREST.
 - Rede interna do Compose; as portas de host da stack Supabase ficam presas ao
   loopback (`127.0.0.1`) pelo `supabase/compose.ports.yml` (criado no §3.4).
 
@@ -319,6 +323,7 @@ criadas pelas migrations Drizzle. Nunca aplique por glob de timestamp:
 8. supabase/migrations/20261013090000_fix_publish_schedule_atomic_temp_snapshot.sql (fix: snapshot em temp table — DEPOIS da 7)
 9. supabase/migrations/20261013110000_s2_notifications_schema.sql   (notificações pessoais + reminder_log)
 10. supabase/migrations/20261013110100_s2_publish_personal_notifications.sql   (RPC v3: pessoais no publish)
+11. supabase/migrations/20261016100000_s3_avatar_storage.sql (bucket avatars + RLS + limpeza)
 ```
 
 Execução (da raiz do repo no VPS, com a stack de pé; `ON_ERROR_STOP` aborta em erro):
@@ -336,8 +341,9 @@ docker cp supabase/migrations/20261012120000_publish_schedule_atomic.sql supabas
 docker cp supabase/migrations/20261013090000_fix_publish_schedule_atomic_temp_snapshot.sql supabase-db:/tmp/008.sql
 docker cp supabase/migrations/20261013110000_s2_notifications_schema.sql supabase-db:/tmp/009.sql
 docker cp supabase/migrations/20261013110100_s2_publish_personal_notifications.sql supabase-db:/tmp/010.sql
+docker cp supabase/migrations/20261016100000_s3_avatar_storage.sql supabase-db:/tmp/011.sql
 
-for f in 001 002 003 004 005 006 007 008 009 010; do
+for f in 001 002 003 004 005 006 007 008 009 010 011; do
   docker exec supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f /tmp/$f.sql || break
 done
 ```
